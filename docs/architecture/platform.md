@@ -1,6 +1,6 @@
 # Campusly: platform architecture and coding rules
 
-This is the reference every module follows. If code and this document disagree, fix one of them.
+This is the reference every module follows. If code and this document disagree, fix one of them. The platform started as a multi-tenant HR product; "company" in the code means the institution (tenant) and "employee" means a staff member. School modules are described in `school-module-brief.md`.
 
 ## 1. Stack
 

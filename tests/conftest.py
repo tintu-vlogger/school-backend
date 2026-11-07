@@ -143,3 +143,38 @@ class EmployeeSession:
 
 def login_as(company, employee):
     return EmployeeSession(company, employee)
+
+
+class PortalSession:
+    """Signed in as a parent or student (portal account) of a company."""
+
+    def __init__(self, company: "Company", login: str, password: str):
+        r = company.client.post("/api/v1/auth/login", json={"email": login, "password": password},
+                                headers={"X-Company-Slug": company.slug})
+        assert r.status_code == 200, r.text
+        body = r.json()
+        self.client, self.slug, self.token, self.user = company.client, company.slug, body["access_token"], body["user"]
+
+    headers = Company.headers
+    get, post, put, patch, delete = Company.get, Company.post, Company.put, Company.patch, Company.delete
+
+
+def school_setup(company: "Company") -> list[dict]:
+    """Quick academic set-up for a test institution; returns the current session's sections."""
+    r = company.post("/academics/quick-setup", json={"institution_type": "school", "programs": ["Grade 1", "Grade 2"],
+                                                     "sections": ["A", "B"], "subjects": ["English", "Maths"]})
+    assert r.status_code == 200, r.text
+    r = company.get("/academics/section-options")
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def add_student(company: "Company", section_id: int, first="Asha", parent_email=None, portal=False) -> dict:
+    """Add a learner with one parent (optionally with portal sign-ins); returns the student detail
+    including `new_logins`."""
+    guardians = [{"first_name": "Parent", "last_name": first, "relation": "father", "is_primary": True,
+                  "phone": f"9{uuid.uuid4().int % 10**9:09d}", "email": parent_email}]
+    r = company.post("/students", json={"first_name": first, "last_name": "Test", "section_id": section_id,
+                                        "guardians": guardians, "create_portal_accounts": portal})
+    assert r.status_code == 201, r.text
+    return r.json()
