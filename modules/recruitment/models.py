@@ -174,7 +174,7 @@ class Candidate(Base):
     custom = _json()  # custom field values
     created_at, updated_at = _stamps()
 
-    applications = relationship("Application", back_populates="candidate", order_by="Application.id")
+    applications = relationship("modules.recruitment.models.Application", back_populates="candidate", order_by="modules.recruitment.models.Application.id")
 
 
 class Application(Base):
@@ -260,7 +260,7 @@ class Interview(Base):
     created_by_name = Column(String(200), nullable=True)
     created_at, updated_at = _stamps()
 
-    application = relationship("Application")
+    application = relationship("modules.recruitment.models.Application")
     kit = relationship("InterviewKit")
     scorecards = relationship("Scorecard", back_populates="interview", order_by="Scorecard.id")
 
@@ -363,7 +363,7 @@ class Offer(Base):
     created_by_name = Column(String(200), nullable=True)
     created_at, updated_at = _stamps()
 
-    application = relationship("Application")
+    application = relationship("modules.recruitment.models.Application")
     candidate = relationship("Candidate")
     job = relationship("Job")
 

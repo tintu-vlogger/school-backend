@@ -139,4 +139,13 @@ MASTERS = {
                         [("Compliance", "compliance"), ("Induction", "induction"), ("Leadership", "leadership"),
                          ("Technical", "technical"), ("Communication", "communication"), ("Sales and service", "sales"),
                          ("Health and safety", "safety"), ("Wellbeing", "wellbeing")]),
+    # Admissions
+    "enquiry_source": ("Enquiry source", "Where an admission enquiry came from", False,
+                       [("Walk-in", "walk_in"), ("Website", "website"), ("Phone", "phone"), ("Campaign", "campaign"),
+                        ("Referral", "referral"), ("Social media", "social"), ("Other", "other")]),
+    "enquiry_lost_reason": ("Enquiry lost reason", "Why an admission enquiry did not go ahead", False,
+                            [("Fees too high", "fees"), ("Too far away", "distance"),
+                             ("Chose another institution", "competitor"), ("No seats", "no_seats"),
+                             ("Could not reach the family", "unreachable"), ("Not eligible", "not_eligible"),
+                             ("Other", "other")]),
 }

@@ -11,6 +11,13 @@ class RegisterRequest(BaseModel):
     company_name: str
     industry: Optional[str] = Field(None, max_length=100)
     ref_code: Optional[str] = Field(None, max_length=12)
+    # Institution details asked for on the sign-up form (all optional for older clients).
+    institution_type: Optional[str] = Field(None, max_length=20)
+    learners: Optional[str] = Field(None, max_length=20)  # approximate number of learners, e.g. "101-500"
+    country: Optional[str] = Field(None, max_length=100)
+    timezone: Optional[str] = Field(None, max_length=64)
+    phone: Optional[str] = Field(None, max_length=20)
+    slug: Optional[str] = Field(None, max_length=60)  # the web address asked for; used when free
 
     @field_validator("full_name", "company_name")
     @classmethod

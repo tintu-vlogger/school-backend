@@ -1,9 +1,14 @@
-"""Company website.
+"""Institution website.
 
-The company's own address (<slug>.campusly.app) opens its organisation website: who they are,
-what they value, life at work, leadership, offices, open jobs and contact, with an employee
-sign-in. HR picks one of four designs and edits the content in Settings → Company website.
+The institution's own address (<slug>.campusly.app) opens its public website: name and motto,
+about, programmes offered (read live from the academic set-up), why families choose it, campus
+life and facilities, leadership, notices and events, admissions (linking to the online
+application at /apply), campuses and contact, with a sign-in button for staff, parents and
+students. The office picks one of four designs and edits the content in Settings → Website.
 Content lives in companies.config["website"]; nothing here needs its own table.
+
+Field names are kept from the first version so saved sites keep loading:
+values = highlights ("why choose us"), life = campus life and facilities, offices = campuses.
 """
 from typing import Literal
 
@@ -18,12 +23,14 @@ from core.errors import NotFound
 from core.security import get_current_user, require_permission
 from modules.company.models import Company
 
-router = APIRouter(prefix="/company/website", tags=["Company website"])
-public_router = APIRouter(prefix="/public/companies", tags=["Company website (public)"])
+router = APIRouter(prefix="/company/website", tags=["Institution website"])
+public_router = APIRouter(prefix="/public/companies", tags=["Institution website (public)"])
 extra_routers = [public_router]
 
 THEMES = ("classic", "modern", "serene", "pulse")
-SECTIONS = ("about", "values", "life", "leaders", "jobs", "offices", "contact")
+SECTIONS = ("about", "programs", "values", "life", "leaders", "notices", "admissions", "jobs", "offices", "contact")
+# Sections that start switched off on a new site (staff vacancies are optional for schools).
+OFF_BY_DEFAULT = ("jobs",)
 MAX_IMAGE = 1_500_000  # characters of a data: URL
 
 
@@ -121,6 +128,25 @@ class Social(BaseModel):
     youtube: str = Field("", max_length=300)
 
 
+class Notice(BaseModel):
+    title: str = Field("", max_length=140)
+    date: str = Field("", max_length=40)  # free text or YYYY-MM-DD, shown as written
+    body: str = Field("", max_length=600)
+    kind: Literal["notice", "event"] = "notice"
+
+
+class Programs(BaseModel):
+    title: str = Field("", max_length=120)
+    body: str = Field("", max_length=600)
+
+
+class Admissions(BaseModel):
+    title: str = Field("", max_length=120)
+    body: str = Field("", max_length=1000)
+    open: bool = True
+    button_label: str = Field("Apply online", max_length=40)
+
+
 class Website(BaseModel):
     published: bool = True
     theme: Literal["classic", "modern", "serene", "pulse"] = "classic"
@@ -134,46 +160,123 @@ class Website(BaseModel):
     offices: list[Office] = Field(default_factory=list, max_length=12)
     contact: Contact = Field(default_factory=Contact)
     social: Social = Field(default_factory=Social)
+    programs: Programs = Field(default_factory=Programs)
+    notices: list[Notice] = Field(default_factory=list, max_length=12)
+    admissions: Admissions = Field(default_factory=Admissions)
     sections: dict[str, bool] = Field(default_factory=dict)
     show_signin: bool = True
 
     @field_validator("sections")
     @classmethod
     def _sections(cls, v):
-        return {k: bool(v.get(k, True)) for k in SECTIONS}
+        return {k: bool(v.get(k, k not in OFF_BY_DEFAULT)) for k in SECTIONS}
+
+
+def _institution(company: Company) -> dict:
+    """The institution profile (type, words used on screen, motto, board, principal)."""
+    try:
+        from modules.academics.service import profile
+        return profile(company)
+    except Exception:
+        return {"type": "school", "type_label": "School", "terms": {}, "motto": "", "board": "",
+                "principal_name": "", "established_year": None, "modules": {}}
+
+
+HIGHLIGHTS = {
+    "school": [("Caring teachers", "Every child is known by name, and teachers have time for each one."),
+               ("Strong foundations", "A balanced curriculum that builds reading, numbers, science and curiosity."),
+               ("Beyond the classroom", "Sports, arts, music and clubs, so every child finds what they love."),
+               ("Parents in the loop", "Attendance, homework, results and fees on the parent app, every day.")],
+    "preschool": [("Play-based learning", "Children learn through play, stories, music and hands-on activities."),
+                  ("Safe and caring", "Secure premises, trained staff and small groups for every child."),
+                  ("Healthy routines", "Nutritious meals, rest time and plenty of outdoor play."),
+                  ("Parents in the loop", "Daily updates, photos and messages on the parent app.")],
+    "college": [("Experienced faculty", "Teachers who know their subject and mentor every student."),
+                ("Career ready", "Projects, internships and placement support from the first year."),
+                ("Vibrant campus", "Clubs, sports, fests and a library that is open late."),
+                ("Everything online", "Timetable, attendance, results and fees in one student app.")],
+    "coaching": [("Results that speak", "Focused preparation with regular tests and clear feedback."),
+                 ("Small batches", "Every student gets attention and doubts are cleared the same day."),
+                 ("Expert tutors", "Subject experts who explain simply and track each student's progress."),
+                 ("Learn anywhere", "Live online classes, recordings and practice tests on the app.")],
+    "training": [("Practical skills", "Hands-on training that prepares you for real work."),
+                 ("Expert trainers", "Trainers from industry who share what actually works."),
+                 ("Flexible batches", "Weekday, weekend and online batches to fit your schedule."),
+                 ("Recognised certificates", "Assessments and certificates you can show employers.")],
+}
+FACILITIES = {
+    "school": ["Smart classrooms", "Science and computer labs", "Library", "Playground and sports",
+               "Safe school transport", "Art and music rooms"],
+    "preschool": ["Bright play rooms", "Outdoor play area", "Activity corners", "CCTV and secure entry",
+                  "Healthy meals", "Safe transport"],
+    "college": ["Modern classrooms", "Labs and workshops", "Central library", "Sports facilities",
+                "Hostel", "Wi-Fi campus"],
+    "coaching": ["Air-conditioned classrooms", "Study hall", "Test series", "Doubt-clearing sessions",
+                 "Online classes", "Study material"],
+    "training": ["Training labs", "Live projects", "Online and classroom batches", "Placement help",
+                 "Study material", "Certificates"],
+}
+
+
+def _kind(inst: dict) -> str:
+    kind = inst.get("type") or "school"
+    return "college" if kind == "university" else kind if kind in HIGHLIGHTS else "school"
 
 
 def defaults(company: Company) -> dict:
-    """A complete, sensible first version so the site looks finished before HR edits anything."""
+    """A complete, sensible first version so the site looks finished before anyone edits it."""
     name = company.company_name
-    city = company.city or "India"
-    industry = (company.industry or "").strip()
-    what = industry.lower() if industry else "our work"
+    city = company.city or ""
+    inst = _institution(company)
+    kind = _kind(inst)
+    words = inst.get("terms") or {}
+    students = (words.get("students") or "Students").lower()
+    programs = (words.get("programs") or "Classes").lower()
+    motto = (inst.get("motto") or "").strip()
+    board = (inst.get("board") or "").strip()
+    headline = motto or {
+        "school": "Where every child is known, challenged and cared for.",
+        "preschool": "A happy, safe place to learn and grow.",
+        "college": "Learn deeply. Think freely. Go further.",
+        "coaching": "Focused teaching. Real results.",
+        "training": "Skills that open doors.",
+    }[kind]
+    leaders = []
+    if inst.get("principal_name"):
+        role = "Principal" if kind in ("school", "preschool", "college") else "Director"
+        leaders.append(Leader(name=inst["principal_name"][:100], role=role))
+    stats = [st for st in (
+        Stat(value=str(inst["established_year"]), label="Established") if inst.get("established_year") else None,
+        Stat(value=board[:24], label="Affiliation") if board else None,
+        Stat(value=city[:24], label="Campus") if city else None,
+    ) if st]
     return Website(
-        hero=Hero(eyebrow=" · ".join(x for x in (industry, company.city) if x) or f"Welcome to {name}",
-                  headline="People who care, doing work that matters.",
-                  subline=f"At {name} we build a workplace where good people grow, ideas are heard and every day counts."),
+        hero=Hero(eyebrow=" · ".join(x for x in (board, city) if x) or inst.get("type_label") or f"Welcome to {name}",
+                  headline=headline[:140],
+                  subline=(f"Welcome to {name}. We help {students} learn with confidence, grow in character "
+                           "and discover what they are capable of.")[:320]),
         about=About(title=f"About {name}",
-                    body=(f"{name} is a team of curious, committed people based in {city}. We take pride in {what}, "
-                          "in treating each other fairly and in keeping our promises to customers and colleagues alike.\n\n"
-                          "We invest in learning, celebrate good work and keep things simple, so everyone can do the best work of their career here.")),
-        # Only facts we know; HR adds founding year, ratings and the like themselves.
-        stats=[st for st in (
-            Stat(value=company.employee_count_band, label="People") if company.employee_count_band else None,
-            Stat(value=company.city, label="Head office") if company.city else None,
-        ) if st],
-        values=[Value(title="Own it", body="We take responsibility, follow through and fix what we find."),
-                Value(title="Keep it simple", body="Clear words, fewer steps, honest answers."),
-                Value(title="Grow together", body="We learn every week and help each other get better."),
-                Value(title="Do right", body="Fair to our people, our customers and the law, always.")],
-        life=Life(title="Life at " + name,
-                  body="Flexible hours, a friendly team and real ownership from day one.",
-                  perks=["Health insurance for family", "Hybrid work", "Learning budget", "Festival celebrations",
-                         "Paid parental leave", "Wellness days"]),
-        leaders=[], offices=[Office(city=city, address=company.address or "", phone=company.phone or "", head_office=True)],
+                    body=(f"{name} is a community of {students}, teachers and families"
+                          f"{' in ' + city if city else ''}. We believe good teaching, a caring environment and "
+                          "close partnership with families help every learner do their best.\n\n"
+                          f"Our {programs} combine strong academics with activities, values and real-world skills, "
+                          "and we keep parents informed at every step.")),
+        stats=stats,
+        values=[Value(title=t, body=b) for t, b in HIGHLIGHTS[kind]],
+        life=Life(title="Campus life",
+                  body="A safe, welcoming campus with the spaces and support to learn, play and grow.",
+                  perks=FACILITIES[kind]),
+        leaders=leaders,
+        offices=[Office(city=city, address=company.address or "", phone=company.phone or "", head_office=True)] if city else [],
         contact=Contact(email=company.email or "", phone=company.phone or "", address=", ".join(
             x for x in (company.address, company.city, company.state, company.pincode) if x)),
-        sections={k: True for k in SECTIONS},
+        programs=Programs(title=f"{(words.get('programs') or 'Classes')} we offer",
+                          body=f"Explore our {programs}. Admissions are open for the coming {(words.get('session') or 'academic year').lower()}."),
+        notices=[],
+        admissions=Admissions(title="Admissions are open",
+                              body=("Apply online in a few minutes. Our admissions team will call you to plan a "
+                                    "campus visit and guide you through the next steps.")),
+        sections={k: k not in OFF_BY_DEFAULT for k in SECTIONS},
     ).model_dump()
 
 
@@ -261,9 +364,44 @@ def public_site(slug: str, response: Response, db: Session = Depends(get_db)):
     site = current(comp)
     if not site["published"]:
         site = {"published": False, "theme": site["theme"], "accent": site["accent"], "show_signin": True}
-        return {"company": _brief(comp, slug), "site": site, "jobs": []}
+        return {"company": _brief(comp, slug), "site": site, "jobs": [], "programs": [], "institution": _inst_brief(comp)}
     return {"company": _brief(comp, slug), "site": site,
-            "jobs": _jobs(db, comp.id) if site["sections"].get("jobs", True) else []}
+            "jobs": _jobs(db, comp.id) if site["sections"].get("jobs", True) else [],
+            "programs": _programs(db, comp.id) if site["sections"].get("programs", True) else [],
+            "institution": _inst_brief(comp)}
+
+
+def _programs(db: Session, company_id: int) -> list[dict]:
+    """Active classes / programmes / courses, in order, with how many sections run this session."""
+    try:
+        from sqlalchemy import func
+        from modules.academics.models import Program, Section
+        from modules.academics.service import current_session
+        sess = current_session(db, company_id)
+        counts = {}
+        if sess:
+            counts = dict(db.query(Section.program_id, func.count(Section.id))
+                          .filter(Section.company_id == company_id, Section.session_id == sess.id,
+                                  Section.active.is_(True)).group_by(Section.program_id).all())
+        rows = (db.query(Program).filter(Program.company_id == company_id, Program.active.is_(True))
+                .order_by(Program.sort_order, Program.name).limit(60).all())
+        return [{"name": p.name, "code": p.code, "level": p.level, "description": (p.description or "")[:300],
+                 "duration_terms": p.duration_terms, "sections": counts.get(p.id, 0)} for p in rows]
+    except Exception:
+        return []
+
+
+def _inst_brief(comp: Company) -> dict:
+    """What the public page needs from the institution profile (words and the admissions switch)."""
+    inst = _institution(comp)
+    words = inst.get("terms") or {}
+    keep = ("program", "programs", "section", "sections", "student", "students", "teacher", "teachers",
+            "guardian", "guardians", "session")
+    return {"type": inst.get("type") or "school", "type_label": inst.get("type_label") or "",
+            "motto": inst.get("motto") or "", "board": inst.get("board") or "",
+            "established_year": inst.get("established_year"),
+            "terms": {k: words[k] for k in keep if k in words},
+            "admissions_online": bool((inst.get("modules") or {}).get("admissions", True))}
 
 
 def _brief(comp: Company, slug: str) -> dict:

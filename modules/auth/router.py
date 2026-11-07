@@ -30,7 +30,7 @@ from modules.auth.schemas import (
 )
 from modules.auth import login_guard
 from core.cache import get_redis
-from modules.company.slugs import unique_slug
+from modules.company.slugs import normalise as normalise_slug, slug_problem, suggest_slug, unique_slug
 
 settings = get_settings()
 
@@ -164,24 +164,46 @@ def _start_trial(db: Session, company: Company) -> None:
 
 @router.post("/register", response_model=TokenResponse)
 def register(req: RegisterRequest, request: Request, db: Session = Depends(get_db)):
-    """Create a new company and sign its owner in. Only on the main site."""
+    """Create a new institution and sign its owner in. Only on the main site."""
     if request.headers.get("x-company-slug"):
         raise HTTPException(status_code=403, detail="New institutions can only sign up on the main site.")
 
     if db.query(Company.id).filter(Company.email == req.email).first():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
 
+    from core.timeutil import is_valid_timezone
+    from modules.academics.service import INSTITUTION_TYPES
     from modules.platform.router import resolve_referral
 
+    if req.institution_type and req.institution_type not in INSTITUTION_TYPES:
+        raise HTTPException(status_code=400, detail="Pick an institution type from the list.")
+    slug = None
+    if req.slug:
+        problem = slug_problem(db, req.slug)
+        if problem:
+            raise HTTPException(status_code=400, detail=problem)
+        slug = normalise_slug(req.slug)
+
+    config: dict = {"owner_name": req.full_name, "plan": "standard"}
+    if req.institution_type:
+        config["institution"] = {"type": req.institution_type}
+    if req.learners:
+        config["learners_band"] = req.learners
+    if req.timezone and is_valid_timezone(req.timezone):
+        config["owner_timezone"] = req.timezone
     company = Company(
         company_name=req.company_name,
-        slug=unique_slug(db, req.company_name),
+        slug=slug or unique_slug(db, req.company_name),
         email=req.email,
         password=hash_password(req.password),
-        industry=req.industry,
-        config={"owner_name": req.full_name, "plan": "standard"},
+        industry=req.industry or (INSTITUTION_TYPES[req.institution_type]["label"] if req.institution_type else "Education"),
+        country=req.country or None,
+        phone=req.phone or None,
+        config=config,
         referred_by_id=resolve_referral(db, req.ref_code),
     )
+    if req.timezone and is_valid_timezone(req.timezone):
+        company.timezone = req.timezone
     _start_trial(db, company)
     db.add(company)
     db.commit()
@@ -193,6 +215,23 @@ def register(req: RegisterRequest, request: Request, db: Session = Depends(get_d
     db.refresh(company)
 
     return TokenResponse(access_token=_owner_token(company), user=_owner_payload(company))
+
+
+# ── Public helpers for the sign-up form ──────────────────────────────
+
+public_router = APIRouter(prefix="/public", tags=["Public"])
+extra_routers = [public_router]
+
+
+@public_router.get("/slug-available")
+def slug_available(slug: str = "", db: Session = Depends(get_db)):
+    """Whether a web address is free to use, with a plain reason and a suggestion when not."""
+    with bypass_rls(db):
+        problem = slug_problem(db, slug)
+        out = {"slug": normalise_slug(slug), "available": problem is None, "reason": problem}
+        if problem and normalise_slug(slug):
+            out["suggestion"] = suggest_slug(db, slug)
+    return out
 
 
 @router.post("/login", response_model=TokenResponse)

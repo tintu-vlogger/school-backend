@@ -1,5 +1,5 @@
-"""Startup data: the first platform admin, system roles for every company, and in
-development a demo company owner with a known login."""
+"""Startup data: the first platform admin, system roles for every institution, and in
+development a demo institution owner with a known login."""
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
@@ -17,7 +17,8 @@ DEMO_COMPANY = {
 
 
 def ensure_default_roles(db: Session, company_id: int) -> None:
-    """Create the system roles (HR admin, HR, manager, employee) for a company, and keep
+    """Create the system roles (administrator, principal, office, teacher, staff, parent, student ...)
+    for an institution, and keep
     their permissions in step with the product defaults. Custom roles are left alone."""
     from modules.roles.catalog import DEFAULT_FIELD_ACCESS, DEFAULT_SCOPES
     from modules.roles.models import DEFAULT_ROLE_PERMISSIONS, SYSTEM_ROLES, Role
@@ -47,7 +48,7 @@ def ensure_default_roles(db: Session, company_id: int) -> None:
 
 
 def setup_company(db: Session, company_id: int) -> None:
-    """Everything a company needs to start: system roles, master lists, number series
+    """Everything an institution needs to start: system roles, master lists, number series
     and default approval flows. Safe to run again; it only adds what is missing."""
     from core.masters import ensure_system_masters
 
@@ -74,7 +75,7 @@ def _extra_setup(db: Session, company_id: int) -> None:
         ensure_defaults(db, company_id)
     except ImportError:
         pass
-    # The owner's own employee record (self-service for the owner).
+    # The owner's own staff record (self-service for the owner).
     from modules.company.owner import ensure_owner_employee
     ensure_owner_employee(db, company_id)
     _module_setup(db, company_id)
@@ -144,7 +145,7 @@ def seed_platform_admin(db: Session) -> None:
 
 
 def seed_demo_company(db: Session) -> None:
-    """Development only: a ready-to-use company owner login."""
+    """Development only: a ready-to-use institution owner login."""
     from core.security import hash_password
     from modules.company.models import Company
 
@@ -161,7 +162,7 @@ def seed_demo_company(db: Session) -> None:
         config={"owner_name": d["owner_name"], "plan": "standard"},
     ))
     db.commit()
-    print(f"[seed] Demo company created: {d['email']} / {d['password']}")
+    print(f"[seed] Demo institution created: {d['email']} / {d['password']}")
 
 
 def _daily_people_tasks(db: Session) -> None:

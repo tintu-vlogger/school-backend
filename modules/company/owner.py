@@ -29,7 +29,7 @@ def _designation(db: Session, company_id: int) -> int:
                                         Designation.designation_name.ilike(OWNER_DESIGNATION)).first())
     if row is None:
         row = Designation(company_id=company_id, designation_name=OWNER_DESIGNATION,
-                          description="Leads the company")
+                          description="Leads the institution")
         db.add(row)
         db.flush()
     return row.id

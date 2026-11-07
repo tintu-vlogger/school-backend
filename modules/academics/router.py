@@ -446,6 +446,58 @@ def apply_curriculum(uuid: UUID, db: Session = Depends(get_db), user: dict = Dep
     return {"added": added}
 
 
+@router.get("/workload")
+def teacher_workload(session_id: int | None = None, db: Session = Depends(get_db),
+                     user: dict = Depends(require_permission(VIEW))):
+    """Weekly periods per teacher across the sections of a session (default: current), from the
+    teacher allocation. Assistants are counted separately; class teacher roles are listed too."""
+    from modules.employees.models import Employee
+    cid = user["company_id"]
+    sess_id = session_id or (service.current_session(db, cid).id if service.current_session(db, cid) else None)
+    if sess_id is None:
+        return {"items": [], "unassigned": 0}
+    sections = (db.query(Section).options(joinedload(Section.program))
+                .filter(Section.company_id == cid, Section.session_id == sess_id, Section.active.is_(True)).all())
+    by_id = {s.id: s for s in sections}
+    allocs = (db.query(SectionSubject).options(joinedload(SectionSubject.subject))
+              .filter(SectionSubject.company_id == cid, SectionSubject.section_id.in_(list(by_id) or [-1])).all())
+    rows: dict[int, dict] = {}
+
+    def row(eid: int) -> dict:
+        return rows.setdefault(eid, {"teacher_id": eid, "periods": 0, "assist_periods": 0, "sections": set(),
+                                     "subjects": set(), "class_teacher_of": [], "lines": []})
+    unassigned = 0
+    for a in allocs:
+        sec = by_id[a.section_id]
+        n = a.weekly_periods or 0
+        if a.teacher_id:
+            r = row(a.teacher_id)
+            r["periods"] += n
+            r["sections"].add(a.section_id)
+            r["subjects"].add(a.subject_id)
+            r["lines"].append({"section": service.section_label(sec), "subject": a.subject.name if a.subject else "",
+                               "periods": n, "role": "teacher"})
+        else:
+            unassigned += 1
+        for eid in a.assistant_ids or []:
+            r = row(eid)
+            r["assist_periods"] += n
+            r["lines"].append({"section": service.section_label(sec), "subject": a.subject.name if a.subject else "",
+                               "periods": n, "role": "assistant"})
+    for sec in sections:
+        if sec.class_teacher_id:
+            row(sec.class_teacher_id)["class_teacher_of"].append(service.section_label(sec))
+    emps = {e.id: e for e in db.query(Employee).filter(Employee.company_id == cid, Employee.id.in_(list(rows) or [-1])).all()}
+    items = []
+    for eid, r in rows.items():
+        e = emps.get(eid)
+        items.append({**r, "name": _name(e) or "Unknown", "uuid": str(e.uuid) if e else None,
+                      "photo": e.profile_image_url if e else None,
+                      "sections": len(r["sections"]), "subjects": len(r["subjects"])})
+    items.sort(key=lambda x: (-x["periods"], x["name"]))
+    return {"items": items, "unassigned": unassigned}
+
+
 # ── Rooms and houses ─────────────────────────────────────────────────
 
 class RoomIn(BaseModel):

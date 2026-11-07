@@ -5,8 +5,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import func
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from core import audit, custom_fields
 from core.crud import by_id_or_400, get_or_404
@@ -144,6 +144,18 @@ def _student_out(db: Session, s: Student, e: Enrollment | None, perms: list[str]
         out["national_id"] = _mask(s.national_id, show)
         out["custom"] = s.custom or {}
         out["guardians"] = [_link_out(l) for l in s.guardian_links]
+        if VIEW in perms or "students.portal.manage" in perms:
+            gids = [l.guardian_id for l in s.guardian_links]
+            accs = {a.guardian_id: a for a in db.query(PortalAccount).filter(
+                PortalAccount.company_id == s.company_id, PortalAccount.guardian_id.in_(gids or [-1])).all()}
+            for g in out["guardians"]:
+                acc = accs.get(g["guardian_id"])
+                g["portal_account"] = _account_out(acc) if acc else None
+        sec = e.section if e else None
+        ct = sec.class_teacher if sec is not None else None
+        out["class_teacher_name"] = f"{ct.first_name} {ct.last_name or ''}".strip() if ct else None
+        out["house_color"] = s.house.color if s.house else None
+        out["session_name"] = e.session.name if e and e.session else None
         out["enrollments"] = [{
             "id": x.id, "uuid": str(x.uuid), "session_id": x.session_id, "session_name": x.session.name if x.session else None,
             "program_id": x.program_id, "program_name": x.program.name if x.program else None,
@@ -176,15 +188,69 @@ def _perms(db: Session, user: dict) -> list[str]:
 
 # ── List, stats, my children ─────────────────────────────────────────
 
+def _primary_guardian(s: Student) -> Guardian | None:
+    links = sorted(s.guardian_links, key=lambda l: (not l.is_primary, l.id))
+    return links[0].guardian if links else None
+
+
+def _list_row(db: Session, s: Student, e: Enrollment | None, perms: list[str]) -> dict:
+    out = _student_out(db, s, e, perms)
+    g = _primary_guardian(s)
+    out.update({"guardian_name": g.full_name if g else None, "guardian_phone": g.phone if g else None,
+                "blood_group": s.blood_group})
+    return out
+
+
+def _filtered_students(db: Session, cid: int, q, section_id, program_id, status, session_id, house_id, gender):
+    query = service.search_students(db, cid, q, section_id, program_id, status or None, session_id)
+    if house_id:
+        query = query.filter(Student.house_id == house_id)
+    if gender:
+        query = query.filter(Student.gender == gender)
+    return query.options(joinedload(Student.house),
+                         selectinload(Student.guardian_links).joinedload(StudentGuardian.guardian))
+
+
 @router.get("")
 def list_students(q: str | None = None, section_id: int | None = None, program_id: int | None = None,
                   status: str | None = Query("active"), session_id: int | None = None,
+                  house_id: int | None = None, gender: str | None = None,
                   params: PageParams = Depends(), db: Session = Depends(get_db),
                   user: dict = Depends(require_permission(VIEW))):
     perms = _perms(db, user)
-    query = service.search_students(db, user["company_id"], q, section_id, program_id, status or None, session_id)
-    query = query.options(joinedload(Student.house))
-    return paginate(query, params, lambda r: _student_out(db, r[0], r[1], perms))
+    query = _filtered_students(db, user["company_id"], q, section_id, program_id, status, session_id, house_id, gender)
+    return paginate(query, params, lambda r: _list_row(db, r[0], r[1], perms))
+
+
+EXPORT_COLUMNS = [("admission_no", "Admission no"), ("name", "Name"), ("gender", "Gender"),
+                  ("date_of_birth", "Date of birth"), ("program_name", "Class"), ("section_label", "Section"),
+                  ("roll_no", "Roll no"), ("house_name", "House"), ("blood_group", "Blood group"),
+                  ("guardian_name", "Guardian"), ("guardian_phone", "Guardian phone"), ("email", "Email"),
+                  ("phone", "Phone"), ("admission_date", "Admission date"), ("status", "Status")]
+
+
+@router.get("/export")
+def export_students(q: str | None = None, section_id: int | None = None, program_id: int | None = None,
+                    status: str | None = Query("active"), session_id: int | None = None,
+                    house_id: int | None = None, gender: str | None = None,
+                    db: Session = Depends(get_db), user: dict = Depends(require_permission(VIEW))):
+    """The filtered directory as CSV (up to 10,000 rows). Audited as an export."""
+    import csv
+    import io
+    from fastapi.responses import Response
+    perms = _perms(db, user)
+    rows = _filtered_students(db, user["company_id"], q, section_id, program_id, status, session_id, house_id,
+                              gender).limit(10000).all()
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow([label for _, label in EXPORT_COLUMNS])
+    for s, e in rows:
+        r = _list_row(db, s, e, perms)
+        w.writerow(["" if r.get(k) is None else str(r.get(k)) for k, _ in EXPORT_COLUMNS])
+    audit.event(db, "export.downloaded", "students", None, {"rows": len(rows), "format": "csv"})
+    db.commit()
+    return Response(content=buf.getvalue(), media_type="text/csv",
+                    headers={"Content-Disposition": 'attachment; filename="students.csv"'})
 
 
 @router.get("/stats")
@@ -385,6 +451,76 @@ def _student(db: Session, user: dict, uuid: UUID) -> Student:
     return s
 
 
+# ── Portal summary, ID cards and bulk sign-ins for a section ─────────
+# (declared before /{uuid} so these fixed paths win)
+
+@router.get("/portal/summary")
+def portal_summary(student_id: int, db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+    """A learner's card for the home page: photo, class, roll number, class teacher, house.
+    Parents see only their children, students themselves; staff need students.view."""
+    cid = user["company_id"]
+    ids = service.visible_student_ids(db, user)
+    if ids is None and VIEW not in _perms(db, user):
+        raise HTTPException(status_code=403, detail="Permission denied")
+    if ids is not None and student_id not in ids:
+        raise HTTPException(status_code=404, detail="Student not found")
+    s = db.query(Student).options(joinedload(Student.house)).filter(Student.company_id == cid,
+                                                                     Student.id == student_id).first()
+    if s is None:
+        raise HTTPException(status_code=404, detail="Student not found")
+    e = service.current_enrollment(db, cid, s.id)
+    out = service.student_brief(s, e)
+    ct = e.section.class_teacher if e and e.section else None
+    out.update({"class_teacher_name": f"{ct.first_name} {ct.last_name or ''}".strip() if ct else None,
+                "house_name": s.house.name if s.house else None, "house_color": s.house.color if s.house else None,
+                "session_name": e.session.name if e and e.session else None})
+    return out
+
+
+@router.get("/section/{section_id}/id-cards")
+def section_id_cards(section_id: int, db: Session = Depends(get_db), user: dict = Depends(require_permission(VIEW))):
+    """Everything printed on the ID cards of a section's learners, by roll number."""
+    cid = user["company_id"]
+    sec = by_id_or_400(db, Section, cid, section_id, "The section")
+    rows = service.section_students(db, cid, section_id)
+    sids = [s.id for s, _ in rows]
+    links: dict[int, list[StudentGuardian]] = {}
+    for l in db.query(StudentGuardian).options(joinedload(StudentGuardian.guardian)).filter(
+            StudentGuardian.company_id == cid, StudentGuardian.student_id.in_(sids or [-1])).all():
+        links.setdefault(l.student_id, []).append(l)
+    out = []
+    for s, e in rows:
+        ls = sorted(links.get(s.id, []), key=lambda l: (not l.is_primary, l.id))
+        g = ls[0].guardian if ls else None
+        out.append({**service.student_brief(s, e), "blood_group": s.blood_group, "date_of_birth": s.date_of_birth,
+                    "address": s.address, "city": s.city, "house_name": s.house.name if s.house else None,
+                    "guardian_name": g.full_name if g else None, "guardian_phone": g.phone if g else None})
+    return {"section": {"id": sec.id, "label": academics.section_label(sec),
+                        "session_name": sec.session.name if sec.session else None},
+            "students": out}
+
+
+@router.post("/section/{section_id}/portal-accounts")
+def section_portal_accounts(section_id: int, db: Session = Depends(get_db),
+                            user: dict = Depends(require_permission("students.portal.manage"))):
+    """Create sign-ins for every learner of a section and their guardians (those with an email
+    or phone). Existing sign-ins are left alone; new passwords are returned once."""
+    cid = user["company_id"]
+    sec = by_id_or_400(db, Section, cid, section_id, "The section")
+    logins, skipped = [], []
+    for s, _ in service.section_students(db, cid, section_id):
+        try:
+            with db.begin_nested():
+                for row in _make_accounts(db, cid, s):
+                    logins.append({**row, "student": s.full_name, "admission_no": s.admission_no})
+        except HTTPException as exc:
+            skipped.append({"student": s.full_name, "reason": exc.detail})
+    audit.event(db, "students.portal_accounts_created", "academic_sections", sec.id,
+                {"count": len(logins), "skipped": len(skipped)}, entity_label=academics.section_label(sec))
+    db.commit()
+    return {"new_logins": logins, "skipped": skipped, "section": academics.section_label(sec)}
+
+
 @router.get("/{uuid}")
 def get_student(uuid: UUID, db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
     s = _student(db, user, uuid)
@@ -528,8 +664,23 @@ def remove_guardian(uuid: UUID, link_id: int, db: Session = Depends(get_db),
 class DocIn(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     doc_type: str | None = Field(None, max_length=60)
-    file_url: str
+    file_url: str | None = None
+    upload_uuid: UUID | None = None  # a file from POST /documents/uploads (links are signed when read)
     expires_on: date | None = None
+
+
+UPLOAD_PREFIX = "upload:"
+
+
+def _doc_links(db: Session, cid: int, docs: list[StudentDocument]) -> dict[str, dict]:
+    """Fresh signed links for documents stored as uploaded files."""
+    ids = [d.file_url[len(UPLOAD_PREFIX):] for d in docs if (d.file_url or "").startswith(UPLOAD_PREFIX)]
+    if not ids:
+        return {}
+    from modules.documents import storage
+    from modules.documents.models import FileBlob
+    rows = db.query(FileBlob).filter(FileBlob.company_id == cid, FileBlob.uuid.in_(ids)).all()
+    return {str(r.uuid): storage.describe(r) for r in rows}
 
 
 @router.get("/{uuid}/documents")
@@ -540,9 +691,16 @@ def list_documents(uuid: UUID, db: Session = Depends(get_db), user: dict = Depen
         if service.visible_student_ids(db, user) is None:
             raise HTTPException(status_code=403, detail="Permission denied")
     rows = db.query(StudentDocument).filter(StudentDocument.student_id == s.id).order_by(StudentDocument.created_at.desc()).all()
-    return [{"id": d.id, "uuid": str(d.uuid), "title": d.title, "doc_type": d.doc_type, "file_url": d.file_url,
-             "verified": d.verified, "expires_on": d.expires_on, "uploaded_by": d.uploaded_by,
-             "created_at": d.created_at} for d in rows]
+    links = _doc_links(db, s.company_id, rows)
+
+    def one(d: StudentDocument) -> dict:
+        f = links.get((d.file_url or "")[len(UPLOAD_PREFIX):]) if (d.file_url or "").startswith(UPLOAD_PREFIX) else None
+        return {"id": d.id, "uuid": str(d.uuid), "title": d.title, "doc_type": d.doc_type,
+                "file_url": f["url"] if f else d.file_url, "download_url": f["download_url"] if f else d.file_url,
+                "file_name": f["name"] if f else None, "file_size": f["size"] if f else None,
+                "verified": d.verified, "expires_on": d.expires_on, "uploaded_by": d.uploaded_by,
+                "created_at": d.created_at}
+    return [one(d) for d in rows]
 
 
 @router.post("/{uuid}/documents", status_code=201)
@@ -553,8 +711,16 @@ def add_document(uuid: UUID, payload: DocIn, db: Session = Depends(get_db), user
         if service.visible_student_ids(db, user) is None:
             raise HTTPException(status_code=403, detail="Permission denied")
     from core import context
-    d = StudentDocument(company_id=s.company_id, student_id=s.id, uploaded_by=context.current().actor_name,
-                        **payload.model_dump())
+    data = payload.model_dump(exclude={"upload_uuid"})
+    if payload.upload_uuid:
+        from modules.documents.models import FileBlob
+        if not db.query(FileBlob.id).filter(FileBlob.company_id == s.company_id,
+                                            FileBlob.uuid == payload.upload_uuid).first():
+            raise HTTPException(status_code=400, detail="The file could not be found. Upload it again.")
+        data["file_url"] = f"{UPLOAD_PREFIX}{payload.upload_uuid}"
+    if not data.get("file_url"):
+        raise HTTPException(status_code=400, detail="Attach a file.")
+    d = StudentDocument(company_id=s.company_id, student_id=s.id, uploaded_by=context.current().actor_name, **data)
     db.add(d)
     db.commit()
     return {"id": d.id, "uuid": str(d.uuid)}
@@ -658,17 +824,35 @@ def guardian_account(uuid: UUID, payload: AccountIn, db: Session = Depends(get_d
 
 
 @portal_router.get("")
-def list_accounts(kind: str | None = None, q: str | None = None, params: PageParams = Depends(),
+def list_accounts(kind: str | None = None, q: str | None = None, active: bool | None = None,
+                  params: PageParams = Depends(),
                   db: Session = Depends(get_db), user: dict = Depends(require_permission("students.portal.manage"))):
     query = db.query(PortalAccount).options(joinedload(PortalAccount.student), joinedload(PortalAccount.guardian)).filter(
         PortalAccount.company_id == user["company_id"])
     if kind:
         query = query.filter(PortalAccount.kind == kind)
+    if active is not None:
+        query = query.filter(PortalAccount.active.is_(active))
     if q:
-        query = query.filter(PortalAccount.login.ilike(f"%{q}%"))
-    return paginate(query.order_by(PortalAccount.login), params, lambda a: {
+        like = f"%{q.strip()}%"
+        query = query.outerjoin(Student, Student.id == PortalAccount.student_id).outerjoin(
+            Guardian, Guardian.id == PortalAccount.guardian_id).filter(
+            or_(PortalAccount.login.ilike(like), Student.first_name.ilike(like), Student.last_name.ilike(like),
+                Student.admission_no.ilike(like), Guardian.first_name.ilike(like), Guardian.last_name.ilike(like)))
+    page = paginate(query.order_by(PortalAccount.login), params)
+    gids = [a.guardian_id for a in page["items"] if a.guardian_id]
+    children: dict[int, list[str]] = {}
+    for l in db.query(StudentGuardian).options(joinedload(StudentGuardian.student)).filter(
+            StudentGuardian.company_id == user["company_id"], StudentGuardian.guardian_id.in_(gids or [-1])).all():
+        children.setdefault(l.guardian_id, []).append(l.student.full_name)
+    page["items"] = [{
         **_account_out(a), "name": (a.student.full_name if a.student else a.guardian.full_name if a.guardian else ""),
-    })
+        "student_uuid": str(a.student.uuid) if a.student else None,
+        "admission_no": a.student.admission_no if a.student else None,
+        "guardian_uuid": str(a.guardian.uuid) if a.guardian else None,
+        "children": children.get(a.guardian_id, []) if a.guardian_id else [],
+    } for a in page["items"]]
+    return page
 
 
 @portal_router.post("/{uuid}/reset-password")

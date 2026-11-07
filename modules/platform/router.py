@@ -25,7 +25,8 @@ from modules.platform.security import (LOCK_MINUTES, MAX_FAILED_LOGINS, client_i
 from modules.company.models import Company
 from modules.employees.models import Employee
 from modules.platform.models import Commission, PaymentCode, Payout, PlatformSetting, PlatformUser, SubscriptionPayment
-from modules.platform.subscription import find_period, find_plan, get_periods, get_plans, platform_settings, quote, subscription_state
+from modules.platform.subscription import (find_period, find_plan, get_periods, get_plans, plan_label, platform_settings, quote,
+                                           subscription_state)
 from core.cache import get_redis
 
 router = APIRouter(prefix="/platform", tags=["Platform"])
@@ -170,7 +171,7 @@ def public_pricing(db: Session = Depends(get_db)):
     return {
         "trial_days": int(tp.get("trial_days") or 0) if tp else 0,
         "trial": ({k: tp.get(k) for k in ("id", "name", "tagline", "features", "whatsapp", "trial_days", "badge")} if tp else None),
-        "plans": [{k: p.get(k) for k in ("id", "name", "tagline", "price", "features", "whatsapp", "badge")} for p in paid_plans(data)],
+        "plans": [{k: p.get(k) for k in ("id", "name", "tagline", "price", "per_learner", "max_learners", "features", "whatsapp", "badge")} for p in paid_plans(data)],
         "periods": [{k: p.get(k) for k in ("id", "label", "months", "discount")} for p in get_periods(data, active_only=True)],
     }
 
@@ -181,7 +182,9 @@ class PlanIn(BaseModel):
     id: str = Field(..., min_length=2, max_length=30, pattern=r"^[a-z0-9_]+$")
     name: str = Field(..., min_length=1, max_length=60)
     tagline: str = Field("", max_length=120)
-    price: int = Field(..., ge=0, le=1000000)        # per month
+    price: int = Field(..., ge=0, le=1000000)        # per month (what the tier bills)
+    per_learner: int = Field(0, ge=0, le=100000)     # ₹ per learner per month, shown on price cards
+    max_learners: int = Field(0, ge=0, le=1000000)   # learner limit of the tier (0 = no limit)
     features: list[str] = Field(default_factory=list, max_length=20)
     whatsapp: bool = False                            # switches on WhatsApp self-service
     active: bool = True
@@ -218,8 +221,8 @@ class CouponIn(BaseModel):
 
 
 class SettingsUpdate(BaseModel):
-    price_standard: int = Field(1250, ge=0, le=100000)
-    price_standard_whatsapp: int = Field(2000, ge=0, le=100000)
+    price_standard: int = Field(3000, ge=0, le=100000)
+    price_standard_whatsapp: int = Field(10000, ge=0, le=100000)
     first_payment_bonus: int = Field(300, ge=0, le=100000)
     percent: int = Field(10, ge=0, le=100)
     percent_months: int = Field(6, ge=0, le=120)
@@ -381,7 +384,7 @@ def admin_analytics(_: PlatformUser = Depends(platform_admin), db: Session = Dep
     plan_mix: dict[str, int] = {}
     for st in states.values():
         if st["status"] == "active":
-            name = st.get("plan_name") or st.get("plan") or "Standard"
+            name = st.get("plan_name") or st.get("plan") or "Starter"
             plan_mix[name] = plan_mix.get(name, 0) + 1
     cities: dict[str, int] = {}
     for b in companies:
@@ -403,7 +406,7 @@ def admin_analytics(_: PlatformUser = Depends(platform_admin), db: Session = Dep
             rev[k] += amt
             count[k] += 1
         d = p.details or {}
-        pname = (d.get("plan") or {}).get("name") or ("Standard + WhatsApp" if p.plan == "standard_whatsapp" else "Standard")
+        pname = (d.get("plan") or {}).get("name") or plan_label(p.plan)
         by_plan[pname] = by_plan.get(pname, 0) + amt
         per = (d.get("period") or {}).get("label") or ("Yearly" if p.months >= 12 else "Monthly" if p.months == 1 else f"{p.months} months")
         by_period[per] = by_period.get(per, 0) + 1
@@ -551,7 +554,7 @@ def record_payment(company_id: int, req: RecordPayment, admin: PlatformUser = De
     """Confirm a UPI payment: extends the paid period, sets the plan, earns commission."""
     b = db.query(Company).filter(Company.id == company_id).first()
     if not b:
-        raise HTTPException(status_code=404, detail="Company not found")
+        raise HTTPException(status_code=404, detail="Institution not found")
     if req.reference:
         dup = db.query(SubscriptionPayment.id).filter(SubscriptionPayment.company_id == b.id, SubscriptionPayment.reference == req.reference.strip()).scalar()
         if dup:
@@ -606,7 +609,7 @@ def _code_view(db: Session, pc: PaymentCode) -> dict:
         "code": pc.code, "status": pc.status,
         "company": {"id": b.id, "name": b.company_name, "slug": b.slug, "phone": b.phone, "email": b.email, "city": b.city} if b else None,
         "plan": pc.plan, "months": pc.months,
-        "plan_name": ((pc.details or {}).get("plan") or {}).get("name") or ("Company + WhatsApp" if pc.plan == "standard_whatsapp" else "Company"),
+        "plan_name": ((pc.details or {}).get("plan") or {}).get("name") or plan_label(pc.plan),
         "period": ((pc.details or {}).get("period") or {}).get("label") or ("Yearly" if pc.months == 12 else "Monthly" if pc.months == 1 else f"{pc.months} months"),
         "details": pc.details,
         "discount_percent": pc.discount_percent, "coupon_code": pc.coupon_code, "coupon_percent": pc.coupon_percent,
@@ -656,7 +659,7 @@ def confirm_payment_code(code: str, req: ConfirmCode, admin: PlatformUser = Depe
         raise HTTPException(status_code=409, detail="This payment is already confirmed")
     b = db.query(Company).filter(Company.id == pc.company_id).first()
     if not b:
-        raise HTTPException(status_code=404, detail="Company not found")
+        raise HTTPException(status_code=404, detail="Institution not found")
     try:
         paid_on = date.fromisoformat(req.paid_at[:10]) if req.paid_at else date.today()
     except ValueError:
@@ -707,12 +710,12 @@ def admin_slug_check(slug: str = "", _: PlatformUser = Depends(platform_admin), 
 @router.post("/admin/companies")
 def admin_create_company(req: NewCompany, admin: PlatformUser = Depends(platform_admin), db: Session = Depends(get_db)):
     """Create a company on behalf of its owner, the same way sign-up does: free trial and
-    Standard plan. Returns the login; a generated password is shown once."""
+    Starter plan. Returns the login; a generated password is shown once."""
     from modules.company.router import _validate_slug
     from seed.seed_data import setup_company
     email = req.email.strip().lower()
     if db.query(Company.id).filter(func.lower(Company.email) == email).first():
-        raise HTTPException(status_code=400, detail="A company with this email already exists.")
+        raise HTTPException(status_code=400, detail="An institution with this email already exists.")
     slug = _validate_slug(req.slug, 0, db)
     if req.password and len(req.password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
@@ -753,10 +756,10 @@ def remove_company_endpoint(company_id: int, req: RemoveCompany, admin: Platform
     from modules.platform.company_removal import remove_company
     b = db.query(Company).filter(Company.id == company_id).first()
     if not b:
-        raise HTTPException(status_code=404, detail="Company not found")
+        raise HTTPException(status_code=404, detail="Institution not found")
     expected = (b.company_name or "").strip() or (b.email or "")
     if req.confirm_name.strip() != expected:
-        raise HTTPException(status_code=400, detail="The name you typed does not match this company.")
+        raise HTTPException(status_code=400, detail="The name you typed does not match this institution.")
     name, slug = expected, b.slug
     try:
         removed = remove_company(db, b.id)
@@ -767,7 +770,7 @@ def remove_company_endpoint(company_id: int, req: RemoveCompany, admin: Platform
         db.commit()
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Could not remove the company; nothing was deleted. ({type(e).__name__})")
+        raise HTTPException(status_code=500, detail=f"Could not remove the institution; nothing was deleted. ({type(e).__name__})")
     forget_company_status(company_id)
     return {"ok": True, "removed": name, "rows": sum(removed.values()), "tables": removed}
 
@@ -781,7 +784,7 @@ def set_company_password(company_id: int, req: CompanyPassword, _: PlatformUser 
     """Support: set a company owner's login password (e.g. a Google sign-up that wants email login too)."""
     b = db.query(Company).filter(Company.id == company_id).first()
     if not b:
-        raise HTTPException(status_code=404, detail="Company not found")
+        raise HTTPException(status_code=404, detail="Institution not found")
     b.password = hash_password(req.password)
     db.commit()
     return {"ok": True}
@@ -804,7 +807,7 @@ class CompanyUpdate(BaseModel):
 def update_company(company_id: int, req: CompanyUpdate, _: PlatformUser = Depends(platform_admin), db: Session = Depends(get_db)):
     b = db.query(Company).filter(Company.id == company_id).first()
     if not b:
-        raise HTTPException(status_code=404, detail="Company not found")
+        raise HTTPException(status_code=404, detail="Institution not found")
     cfg = dict(b.config or {})
     if req.plan:
         plan = find_plan(platform_settings(db), req.plan)

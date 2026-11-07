@@ -15,7 +15,7 @@ router = APIRouter(prefix="/settings", tags=["Settings"])
 def _get_company(db: Session, company_id: int) -> Company:
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
+        raise HTTPException(status_code=404, detail="Institution not found")
     return company
 
 
@@ -30,7 +30,7 @@ def get_subscription(
     ps = platform_settings(db)
     out = subscription_state(company)
     # what the company can buy now (only switched-on plans and payment choices)
-    out["plans"] = [{k: p.get(k) for k in ("id", "name", "tagline", "price", "features", "whatsapp", "badge")} for p in paid_plans(ps)]
+    out["plans"] = [{k: p.get(k) for k in ("id", "name", "tagline", "price", "per_learner", "max_learners", "features", "whatsapp", "badge")} for p in paid_plans(ps)]
     out["periods"] = [{k: p.get(k) for k in ("id", "label", "months", "discount", "coupons")} for p in get_periods(ps, active_only=True)]
     out["prices"] = {"standard": ps["price_standard"], "standard_whatsapp": ps["price_standard_whatsapp"]}
     out["discounts"] = {"1": 0, "12": ps["discount_12"]}

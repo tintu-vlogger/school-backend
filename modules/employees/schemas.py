@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-ROLES = ("admin", "hr", "manager", "employee")
+ROLES = ("admin", "principal", "hr", "manager", "teacher", "accountant", "librarian", "employee")
 
 
 def _no_tags(v):

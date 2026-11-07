@@ -16,7 +16,7 @@ router = APIRouter(prefix="/public/companies", tags=["Public companies"])
 def _active_company(db: Session, slug: str) -> Company:
     company = db.query(Company).filter(Company.slug == slug, Company.active == True).first()  # noqa: E712
     if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
+        raise HTTPException(status_code=404, detail="Institution not found")
     return company
 
 

@@ -18,7 +18,7 @@ router = APIRouter(prefix="/company", tags=["Company"])
 def _company(db: Session, company_id: int) -> Company:
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
+        raise HTTPException(status_code=404, detail="Institution not found")
     return company
 
 
@@ -134,9 +134,9 @@ def complete_onboarding(req: OnboardingRequest, current_user: dict = Depends(req
     if name:
         company.company_name = name
     if not (company.company_name or "").strip():
-        raise HTTPException(status_code=400, detail="Enter your company name.")
+        raise HTTPException(status_code=400, detail="Enter your institution name.")
     if not data.get("slug") and not company.slug:
-        raise HTTPException(status_code=400, detail="Choose your company's web address.")
+        raise HTTPException(status_code=400, detail="Choose your institution's web address.")
     if data.get("slug") is not None:
         data["slug"] = _validate_slug(data["slug"], company.id, db)
     _clean_ids(data)

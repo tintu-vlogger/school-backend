@@ -333,8 +333,19 @@ def _send(db: Session, instance: WorkflowInstance, employee_id: int | None, titl
            actor_employee_id=ctx.employee_id, data=data)
 
 
+def _portal_requester(instance: WorkflowInstance) -> int | None:
+    """Portal account (parent / student) that raised the request, if any."""
+    return (instance.payload or {}).get("_portal_account_id")
+
+
 def _notify(db: Session, instance: WorkflowInstance, employee_id: int | None, message: str) -> None:
-    """Tell the requester (employee_id None = the owner asked) about their request."""
+    """Tell the requester (employee_id None = the owner asked) about their request. Requests
+    raised by a parent or student go to their portal sign-in instead."""
+    portal_id = _portal_requester(instance)
+    if portal_id and employee_id is None:
+        from modules.notifications.service import notify_portal
+        notify_portal(db, instance.company_id, [portal_id], kind="approval.update", title=message[:200], body=message)
+        return
     _send(db, instance, employee_id, message, kind="approval.update", owner=employee_id is None,
           link=f"/dashboard/inbox?request={instance.uuid}")
 
@@ -351,7 +362,8 @@ def _start_step(db: Session, instance: WorkflowInstance, requester) -> bool:
     variables = variables_for(instance, requester)
     # The company owner asking (with or without their own employee record): never ask the
     # owner to approve their own request.
-    owner_asks = requester is None or requester.id == _owner_employee_id(db, instance.company_id)
+    owner_asks = (requester is None and not _portal_requester(instance)) or \
+        (requester is not None and requester.id == _owner_employee_id(db, instance.company_id))
     today = _today(db, instance.company_id)
     while instance.current_step < len(steps):
         idx = instance.current_step
@@ -422,8 +434,11 @@ def submit(db: Session, company_id: int, request_type: str, payload: dict, title
     if rt is None:
         raise BadRequest("Unknown kind of request.")
     requester = _requester_from_context(db, company_id)
+    payload = dict(payload or {})
+    if context.current().portal_account_id and requester is None:
+        payload["_portal_account_id"] = context.current().portal_account_id
     instance = WorkflowInstance(
-        company_id=company_id, request_type=request_type, title=title[:250], payload=payload or {},
+        company_id=company_id, request_type=request_type, title=title[:250], payload=payload,
         subject_type=subject_type, subject_id=subject_id,
         requester_employee_id=requester.id if requester else None,
         requester_name=_name(requester) if requester else (context.current().actor_name or "Company owner"),
@@ -563,7 +578,8 @@ def cancel(db: Session, company_id: int, instance: WorkflowInstance, reason: str
         raise BadRequest("Only pending requests can be withdrawn.")
     ctx = context.current()
     mine = (instance.requester_employee_id is not None and instance.requester_employee_id == ctx.employee_id) or \
-           (instance.requester_employee_id is None and ctx.actor_type == "owner")
+           (instance.requester_employee_id is None and ctx.actor_type == "owner" and not _portal_requester(instance)) or \
+           (ctx.portal_account_id is not None and _portal_requester(instance) == ctx.portal_account_id)
     if not mine and ctx.actor_type != "owner":
         raise Forbidden("Only the person who asked can withdraw this request.")
     audit.event(db, "workflow.cancelled", "workflow_instances", instance.id, {"reason": reason},

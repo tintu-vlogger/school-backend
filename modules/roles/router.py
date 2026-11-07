@@ -27,7 +27,7 @@ MANAGE = require_permission("settings.roles.manage")
 
 # Base roles, most powerful first. An employee's base role (employees.role) is the most
 # powerful system role they hold; every other role they hold is an extra role.
-BASE_ORDER = ["admin", "hr", "manager", "employee"]
+BASE_ORDER = ["admin", "principal", "hr", "accountant", "manager", "teacher", "librarian", "employee"]
 
 
 class RoleIn(BaseModel):
