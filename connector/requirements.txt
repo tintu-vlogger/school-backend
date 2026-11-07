@@ -1,0 +1,14 @@
+# The connector itself needs only Python 3.10+ and these:
+sqlalchemy>=2.0
+tzdata                 # time zones on Windows
+
+# Install only what your office uses:
+pyzk>=0.9              # ZKTeco / eSSL devices over the network (port 4370)
+pymssql>=2.3           # SQL Server (Matrix COSEC, eSSL eTimeTrackLite)
+# pymysql>=1.1         # MySQL / MariaDB
+# psycopg2-binary>=2.9 # PostgreSQL (ZKBioTime)
+# oracledb>=2.0        # Oracle
+# pyodbc>=5.0          # MS Access files (ZKTime / ZKAccess att2000.mdb), Windows only
+
+# To build connector.exe:
+# pyinstaller>=6.0

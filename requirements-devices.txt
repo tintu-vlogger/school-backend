@@ -1,0 +1,9 @@
+# Optional drivers for attendance device connections. The API runs without them; a device
+# that needs a missing one shows a clear message on the Devices page.
+#   pip install -r requirements-devices.txt
+pymssql>=2.3          # SQL Server databases (Matrix COSEC, eSSL eTimeTrackLite)
+pymysql>=1.1          # MySQL / MariaDB databases
+oracledb>=2.0         # Oracle databases
+pyzk>=0.9             # ZKTeco / eSSL devices over the network (port 4370)
+# PostgreSQL (ZKBioTime) uses psycopg2, already in requirements.txt.
+# MS Access files are read by the office connector (backend/connector), not the server.

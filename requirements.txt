@@ -1,0 +1,27 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+sqlalchemy==2.0.36
+psycopg2-binary==2.9.10
+redis==5.2.1
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+python-multipart==0.0.19
+pydantic[email]==2.10.3
+pydantic-settings==2.7.1
+alembic==1.14.0
+httpx==0.28.1
+Pillow==11.1.0
+openpyxl==3.1.5
+msoffcrypto-tool==6.1.0
+qrcode==8.0
+reportlab==4.2.5
+weasyprint==63.1
+google-auth
+requests
+pytest==9.2.0
+pypdf==5.1.0
+paramiko==5.1.0
+pyHanko==0.38.1
+
+# Optional attendance device drivers (SQL Server, MySQL, Oracle, ZKTeco LAN): see requirements-devices.txt

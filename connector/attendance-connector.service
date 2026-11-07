@@ -1,0 +1,16 @@
+# Linux (systemd): copy the connector folder to /opt/attendance-connector, then
+#   sudo cp attendance-connector.service /etc/systemd/system/
+#   sudo systemctl enable --now attendance-connector
+[Unit]
+Description=Attendance connector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/opt/attendance-connector
+ExecStart=/usr/bin/python3 /opt/attendance-connector/connector.py run --folder /opt/attendance-connector
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,17 @@
+node_modules/
+.next/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+*.egg-info/
+dist/
+build/
+pgadmin_data/
+postgres_data/
+redis_data/
+evolution_data/
+backend/assets/tts_cache/
+
+.envrc
+.venv/

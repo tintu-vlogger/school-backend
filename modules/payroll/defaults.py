@@ -1,0 +1,182 @@
+"""Default payroll set-up every company starts with: settings, salary components,
+structures, a pay group and the bank file formats. All of it is editable on screen."""
+from __future__ import annotations
+
+DEFAULT_SETTINGS = {
+    "rounding": "nearest",                 # net pay: nearest | up | down | none
+    "proration_basis": "calendar",         # calendar | fixed_30 | fixed_26 | working_days
+    "overtime_formula": "round(2 * (basic + da) / 26 / 8 * hours, 2)",
+    "overtime_component": "OT",
+    "pf": {"employee_basis": "ceiling", "employer_basis": "ceiling", "apply_wage_rule": True},
+    "esi_include_overtime": True,
+    "bonus_rate": 8.33,
+    "variance_percent": 20,
+    "default_state": None,                 # PT/LWF state when an employee's location has none
+    "revision_reasons": [
+        {"value": "first_salary", "label": "First salary"}, {"value": "annual_raise", "label": "Annual raise"},
+        {"value": "promotion", "label": "Promotion"}, {"value": "correction", "label": "Correction"},
+        {"value": "market_adjustment", "label": "Market adjustment"}, {"value": "transfer", "label": "Transfer"},
+    ],
+    "payslip": {"password": "pan", "show_ytd": True, "show_leave": True, "show_tax": True, "hindi": True,
+                "email_on_publish": True, "footer": "This is a computer-generated payslip and does not need a signature.",
+                "accent": "#4f46e5"},
+    "tax": {"declaration_from": "04-01", "declaration_to": "07-31", "proof_from": "01-01", "proof_to": "02-28",
+            "default_regime": "new", "allow_regime_change": True, "previous_employer": True},
+    "checks": {"block_below_min_wage": True, "block_negative_net": True, "deduction_warn_percent": 50,
+               "missing_bank": "warn", "missing_pan": "warn"},
+    "settlement": {"leave_encash_basis": "basic_da", "leave_encash_divisor": 26, "notice_basis": "gross",
+                   "notice_divisor": 30, "pay_bonus_on_exit": True},
+    "bank": {"default_format": "generic_neft", "debit_account": "", "debit_ifsc": "", "narration": "Salary {month}",
+             "other_bank_mode": "auto", "rtgs_from": 200000},
+    # flexible benefit plan: allocation window, bill cut-off, and how accrued amounts are paid
+    "fbp": {"enabled": True, "declaration_from": "04-01", "declaration_to": "05-31", "claim_last_date": "03-10",
+            "allow_change_on_revision": True},
+    # pay equity report: gap (in %) between average pay of men and women in the same designation and grade that is flagged
+    "pay_equity": {"gap_percent": 5, "min_group_size": 1, "basis": "annual_ctc"},
+    # Form 16 digital signature: certificate file (the password is never stored) and signatory details
+    "signing": {"certificate_file_uuid": None, "subject": None, "issuer": None, "valid_to": None, "signer_name": "",
+                "signer_designation": "", "place": "", "signed": {}},
+    # salary revisions from pay reviews wait for payroll's review unless this is on
+    "revisions": {"auto_apply": False},
+    "gl": {"salary_payable": "2101", "pf_payable": "2111", "esi_payable": "2112", "pt_payable": "2113",
+           "lwf_payable": "2114", "tds_payable": "2115", "loan_recovery": "1301", "other_deductions": "2199",
+           "employer_cost_default": "5101", "cost_centre_by": "cost_centre"},
+}
+
+# code, name, Hindi, kind, calc, formula, wage_class, pf, esi, prorate, taxability, exemption, one_time, sort, extra
+COMPONENTS = [
+    ("BASIC", "Basic", "मूल वेतन", "earning", "formula", "round(monthly_ctc * 0.5)", "wage", True, True, True, "taxable", None, False, 10, {}),
+    ("DA", "Dearness allowance", "महंगाई भत्ता", "earning", "fixed", None, "wage", True, True, True, "taxable", None, False, 20, {}),
+    ("HRA", "House rent allowance", "मकान किराया भत्ता", "earning", "formula", "round(basic * if(metro, 0.5, 0.4))", "exclusion", False, True, True, "partly", "hra", False, 30, {}),
+    ("CONV", "Conveyance allowance", "वाहन भत्ता", "earning", "fixed", None, "exclusion", False, True, True, "taxable", None, False, 40, {}),
+    ("LTA", "Leave travel allowance", "अवकाश यात्रा भत्ता", "earning", "fixed", None, "exclusion", False, True, True, "partly", "lta", False, 50, {}),
+    ("SPECIAL", "Special allowance", "विशेष भत्ता", "earning", "balance", None, "exclusion", False, True, True, "taxable", None, False, 90, {}),
+    ("OT", "Overtime", "समयोपरि", "earning", "system", None, "exclusion", False, True, False, "taxable", None, False, 100, {"in_ctc": False}),
+    ("SHIFT", "Shift allowance", "पाली भत्ता", "earning", "system", None, "exclusion", False, True, False, "taxable", None, False, 105, {"in_ctc": False}),
+    ("INCENTIVE", "Incentive", "प्रोत्साहन", "earning", "manual", None, "exclusion", False, True, False, "taxable", None, True, 110, {"in_ctc": False}),
+    ("BONUS", "Bonus", "बोनस", "earning", "manual", None, "exclusion", False, False, False, "taxable", None, True, 120, {"in_ctc": False}),
+    ("ARREARS", "Arrears", "बकाया", "earning", "system", None, "none", False, False, False, "taxable", None, True, 130, {"in_ctc": False}),
+    ("LEAVE_ENC", "Leave encashment", "अवकाश नकदीकरण", "earning", "system", None, "none", False, False, False, "taxable", None, True, 140, {"in_ctc": False}),
+    ("REIMB", "Reimbursements", "प्रतिपूर्ति", "reimbursement", "system", None, "none", False, False, False, "exempt", "bills", True, 150, {"in_ctc": False}),
+    ("FUEL", "Fuel and travel (flexible)", "ईंधन भत्ता", "reimbursement", "fixed", None, "none", False, False, True, "partly", "bills", False, 160, {"fbp": True, "fbp_max": 36000}),
+    ("PHONE", "Phone and internet (flexible)", "दूरभाष भत्ता", "reimbursement", "fixed", None, "none", False, False, True, "partly", "bills", False, 161, {"fbp": True, "fbp_max": 24000}),
+    ("MEAL", "Meal card (flexible)", "भोजन भत्ता", "reimbursement", "fixed", None, "none", False, False, True, "partly", "bills", False, 162, {"fbp": True, "fbp_max": 26400, "fbp_regimes": ["old"]}),
+    ("BOOKS", "Books and periodicals (flexible)", "पुस्तक भत्ता", "reimbursement", "fixed", None, "none", False, False, True, "partly", "bills", False, 163, {"fbp": True, "fbp_max": 12000}),
+    ("FBP_BAL", "Flexible benefits not claimed", "अदावाकृत लचीले लाभ", "earning", "system", None, "none", False, False, False, "taxable", None, True, 165, {"in_ctc": False}),
+    ("GRATUITY_PAY", "Gratuity", "उपदान भुगतान", "earning", "system", None, "none", False, False, False, "partly", None, True, 170, {"in_ctc": False}),
+    ("NOTICE_PAY", "Notice pay", "नोटिस वेतन", "earning", "system", None, "none", False, False, False, "taxable", None, True, 171, {"in_ctc": False}),
+    ("RETRENCH", "Retrenchment compensation", "छंटनी मुआवजा", "earning", "system", None, "none", False, False, False, "partly", None, True, 172, {"in_ctc": False}),
+    # deductions
+    ("INS_PREM", "Insurance premium (your share)", "बीमा प्रीमियम", "deduction", "system", None, "none", False, False, False, "exempt", None, False, 245, {}),
+    ("PF_EE", "Provident fund", "भविष्य निधि", "deduction", "system", None, "none", False, False, False, "exempt", None, False, 200, {}),
+    ("VPF", "Voluntary PF", "स्वैच्छिक भविष्य निधि", "deduction", "system", None, "none", False, False, False, "exempt", None, False, 205, {}),
+    ("ESI_EE", "ESI", "कर्मचारी राज्य बीमा", "deduction", "system", None, "none", False, False, False, "exempt", None, False, 210, {}),
+    ("PT", "Professional tax", "व्यवसाय कर", "deduction", "system", None, "none", False, False, False, "exempt", None, False, 220, {}),
+    ("LWF_EE", "Labour welfare fund", "श्रम कल्याण निधि", "deduction", "system", None, "none", False, False, False, "exempt", None, False, 230, {}),
+    ("TDS", "Income tax (TDS)", "आयकर", "deduction", "system", None, "none", False, False, False, "exempt", None, False, 240, {}),
+    ("LOAN", "Loan instalment", "ऋण किस्त", "deduction", "system", None, "none", False, False, False, "exempt", None, False, 250, {}),
+    ("ADVANCE", "Salary advance recovery", "अग्रिम वसूली", "deduction", "system", None, "none", False, False, False, "exempt", None, False, 255, {}),
+    ("OTHER_DED", "Other deduction", "अन्य कटौती", "deduction", "manual", None, "none", False, False, False, "exempt", None, True, 260, {}),
+    ("NOTICE_REC", "Notice pay recovery", "नोटिस वेतन वसूली", "deduction", "system", None, "none", False, False, False, "exempt", None, True, 265, {}),
+    # employer contributions
+    ("PF_ER", "Employer PF", "नियोक्ता भविष्य निधि", "employer", "system", None, "none", False, False, False, "exempt", None, False, 300, {}),
+    ("EPS_ER", "Employer pension (EPS)", "कर्मचारी पेंशन", "employer", "system", None, "none", False, False, False, "exempt", None, False, 305, {"show_on_payslip": False}),
+    ("EDLI", "EDLI", "बीमा (EDLI)", "employer", "system", None, "none", False, False, False, "exempt", None, False, 310, {"show_on_payslip": False, "in_ctc": False}),
+    ("PF_ADMIN", "PF admin charges", "प्रशासनिक शुल्क", "employer", "system", None, "none", False, False, False, "exempt", None, False, 315, {"show_on_payslip": False, "in_ctc": False}),
+    ("ESI_ER", "Employer ESI", "नियोक्ता ESI", "employer", "system", None, "none", False, False, False, "exempt", None, False, 320, {}),
+    ("LWF_ER", "Employer LWF", "नियोक्ता LWF", "employer", "system", None, "none", False, False, False, "exempt", None, False, 330, {"in_ctc": False}),
+    ("GRATUITY", "Gratuity (provision)", "उपदान", "employer", "system", None, "none", False, False, False, "exempt", None, False, 340, {"show_on_payslip": False}),
+    ("NPS_ER", "Employer NPS", "नियोक्ता NPS", "employer", "formula", None, "none", False, False, True, "partly", "employer_nps", False, 350, {}),
+]
+
+STRUCTURES = [
+    {"name": "Standard staff", "code": "STAFF", "description": "Basic 50% of CTC, HRA on basic, special allowance balances.",
+     "min_ctc": 300000, "max_ctc": 2500000,
+     "lines": [{"component": "BASIC", "calc": "formula", "formula": "round(monthly_ctc * 0.5)"},
+               {"component": "HRA", "calc": "formula", "formula": "round(basic * if(metro, 0.5, 0.4))"},
+               {"component": "LTA", "calc": "formula", "formula": "if(monthly_ctc > 50000, 2500, 0)"},
+               {"component": "SPECIAL", "calc": "balance"}]},
+    {"name": "Management", "code": "MGMT", "description": "Basic 50%, HRA, flexible benefit plan and employer NPS.",
+     "min_ctc": 1800000, "max_ctc": 9000000,
+     "lines": [{"component": "BASIC", "calc": "formula", "formula": "round(monthly_ctc * 0.5)"},
+               {"component": "HRA", "calc": "formula", "formula": "round(basic * if(metro, 0.5, 0.4))"},
+               {"component": "LTA", "calc": "fixed", "value": 5000},
+               {"component": "FUEL", "calc": "fixed", "value": 3000},
+               {"component": "PHONE", "calc": "fixed", "value": 2000},
+               {"component": "NPS_ER", "calc": "formula", "formula": "round(basic * 0.1)"},
+               {"component": "SPECIAL", "calc": "balance"}]},
+    {"name": "Workers", "code": "WORK", "description": "Basic and DA at three quarters of CTC for minimum-wage and ESI-covered staff.",
+     "min_ctc": 150000, "max_ctc": 400000,
+     "lines": [{"component": "BASIC", "calc": "formula", "formula": "round(monthly_ctc * 0.6)"},
+               {"component": "DA", "calc": "formula", "formula": "round(monthly_ctc * 0.15)"},
+               {"component": "HRA", "calc": "formula", "formula": "round(basic * 0.1)"},
+               {"component": "CONV", "calc": "fixed", "value": 1600},
+               {"component": "SPECIAL", "calc": "balance"}]},
+]
+
+PAY_GROUPS = [{"name": "Monthly staff", "code": "MONTHLY", "is_default": True, "attendance_cutoff_day": 25, "pay_day": 1}]
+
+# Bank transfer file layouts. Columns use tokens filled from each payslip:
+# {account} {ifsc} {name} {amount} {employee_code} {email} {narration} {debit_account} {mode} {date:%d/%m/%Y} {bank_code}
+BANK_FORMATS = {
+    "generic_neft": {"label": "Standard NEFT / RTGS (CSV)", "delimiter": ",", "extension": "csv", "header": True,
+                     "columns": [["Payment mode", "{mode}"], ["Beneficiary name", "{name}"], ["Account number", "{account}"],
+                                 ["IFSC", "{ifsc}"], ["Amount", "{amount}"], ["Debit account", "{debit_account}"],
+                                 ["Value date", "{date:%d/%m/%Y}"], ["Narration", "{narration}"], ["Employee ID", "{employee_code}"],
+                                 ["Email", "{email}"]]},
+    "hdfc": {"label": "HDFC Bank bulk upload", "delimiter": ",", "extension": "txt", "header": False,
+             "columns": [["Transaction type", "{hdfc_type}"], ["Beneficiary code", "{employee_code}"],
+                         ["Account number", "{account}"], ["Amount", "{amount}"], ["Beneficiary name", "{name}"],
+                         ["", ""], ["", ""], ["", ""], ["", ""], ["", ""], ["", ""], ["", ""], ["", ""],
+                         ["Narration", "{narration}"], ["", ""], ["", ""], ["", ""], ["", ""], ["", ""], ["", ""],
+                         ["Value date", "{date:%d/%m/%Y}"], ["", ""], ["IFSC", "{ifsc}"], ["Bank name", "{bank_name}"],
+                         ["", ""], ["Email", "{email}"]]},
+    "icici": {"label": "ICICI Bank bulk payment", "delimiter": ",", "extension": "csv", "header": True,
+              "columns": [["PYMT_PROD_TYPE_CODE", "PAB_VENDOR"], ["PYMT_MODE", "{icici_mode}"],
+                          ["DEBIT_ACC_NO", "{debit_account}"], ["BNF_NAME", "{name}"], ["BENE_ACC_NO", "{account}"],
+                          ["BENE_IFSC", "{ifsc}"], ["AMOUNT", "{amount}"], ["DEBIT_NARR", "{narration}"],
+                          ["CREDIT_NARR", "{narration}"], ["MOBILE_NUM", "{phone}"], ["EMAIL_ID", "{email}"],
+                          ["REMARK", "{employee_code}"], ["PYMT_DATE", "{date:%d-%m-%Y}"]]},
+    "sbi": {"label": "SBI CMP salary upload", "delimiter": "|", "extension": "txt", "header": False,
+            "columns": [["Account number", "{account}"], ["IFSC", "{ifsc}"], ["Amount", "{amount}"],
+                        ["Name", "{name}"], ["Narration", "{narration}"], ["Reference", "{employee_code}"]]},
+    "axis": {"label": "Axis Bank bulk upload", "delimiter": ",", "extension": "csv", "header": True,
+             "columns": [["Payment Mode", "{mode}"], ["Amount", "{amount}"], ["Value Date", "{date:%d-%m-%Y}"],
+                         ["Beneficiary Name", "{name}"], ["Beneficiary Account", "{account}"], ["IFSC", "{ifsc}"],
+                         ["Debit Account", "{debit_account}"], ["Customer Reference", "{employee_code}"],
+                         ["Remarks", "{narration}"], ["Email", "{email}"]]},
+    "kotak": {"label": "Kotak Mahindra Bank bulk upload", "delimiter": ",", "extension": "csv", "header": True,
+              "columns": [["Client_Code", "{client_code}"], ["Product_Code", "SALARY"], ["Payment_Type", "{mode}"],
+                          ["Payment_Ref_No", "{employee_code}"], ["Payment_Date", "{date:%d/%m/%Y}"],
+                          ["Dr_Ac_No", "{debit_account}"], ["Amount", "{amount}"], ["Bank_Code_Indicator", "M"],
+                          ["Beneficiary_Name", "{name}"], ["IFSC_Code", "{ifsc}"], ["Beneficiary_Acc_No", "{account}"],
+                          ["Beneficiary_Email", "{email}"], ["Debit_Narration", "{narration}"]]},
+}
+
+EXPENSE_CATEGORIES = [
+    {"code": "TRAVEL", "name": "Travel", "icon": "plane", "default_limit": 25000, "receipt_required_above": 0},
+    {"code": "HOTEL", "name": "Hotel stay", "icon": "bed", "kind": "per_day", "default_limit": 6000, "receipt_required_above": 0,
+     "limits": [{"grade_codes": ["M1", "M2", "M3"], "per_day": 9000}]},
+    {"code": "FOOD", "name": "Food and meals", "icon": "utensils", "kind": "per_day", "default_limit": 1200, "receipt_required_above": 500},
+    {"code": "FUEL", "name": "Fuel and mileage", "icon": "car", "kind": "mileage", "mileage_rates": {"car": 12, "two_wheeler": 5},
+     "monthly_limit": 6000, "component_code": "FUEL"},
+    {"code": "PHONE", "name": "Phone and internet", "icon": "smartphone", "monthly_limit": 2000, "receipt_required_above": 0,
+     "component_code": "PHONE"},
+    {"code": "CLIENT", "name": "Client meetings", "icon": "handshake", "default_limit": 5000, "receipt_required_above": 0},
+    {"code": "OFFICE", "name": "Office supplies", "icon": "package", "default_limit": 3000, "receipt_required_above": 200},
+    {"code": "TRAINING", "name": "Courses and books", "icon": "book", "default_limit": 20000, "receipt_required_above": 0,
+     "component_code": "BOOKS"},
+]
+
+LOAN_TYPES = [
+    {"code": "PERSONAL", "name": "Personal loan", "kind": "loan", "max_amount": 300000, "max_salary_multiple": 3,
+     "max_instalments": 24, "interest_rate": 6, "min_service_months": 12},
+    {"code": "VEHICLE", "name": "Vehicle loan", "kind": "loan", "max_amount": 500000, "max_instalments": 36,
+     "interest_rate": 7, "min_service_months": 12},
+    {"code": "EMERGENCY", "name": "Emergency / medical loan", "kind": "loan", "max_amount": 200000, "max_instalments": 12,
+     "interest_rate": 0, "medical": True},
+    {"code": "FESTIVAL", "name": "Festival advance", "kind": "advance", "max_amount": 25000, "max_instalments": 10,
+     "interest_rate": 0, "min_service_months": 3},
+    {"code": "SALARY_ADV", "name": "Salary advance", "kind": "advance", "max_salary_multiple": 1, "max_instalments": 3,
+     "interest_rate": 0},
+]
