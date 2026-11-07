@@ -235,7 +235,10 @@ class FeeInvoice(Base):
     __tablename__ = "fee_invoices"
     __table_args__ = (Index("ix_fee_invoices_company_student", "company_id", "student_id", "status"),
                       Index("ix_fee_invoices_company_due", "company_id", "due_date"),
-                      Index("ix_fee_invoices_instalment", "company_id", "instalment_id"))
+                      Index("ix_fee_invoices_instalment", "company_id", "instalment_id"),
+                      # One live invoice per learner per instalment (cancelled ones don't count).
+                      Index("uq_fee_invoices_live_instalment", "student_id", "instalment_id", unique=True,
+                            postgresql_where=text("instalment_id IS NOT NULL AND status <> 'cancelled'")))
     id = Column(Integer, primary_key=True)
     uuid = _uuid()
     company_id = _company()

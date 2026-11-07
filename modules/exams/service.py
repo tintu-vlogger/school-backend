@@ -755,6 +755,14 @@ def attendance_percent(db: Session, company_id: int, student_id: int, start: dat
             mod = importlib.import_module(modname)
         except Exception:
             continue
+        bulk = getattr(mod, "percentages", None)  # percentages(db, cid, [ids], start, end) -> {id: {pct, ...}}
+        if callable(bulk) and start and end:
+            try:
+                row = (bulk(db, company_id, [student_id], start, end) or {}).get(student_id) or {}
+                if row.get("pct") is not None:
+                    return D(row["pct"])
+            except Exception:
+                pass
         for fname in ("attendance_percent", "student_attendance_percent", "percentage", "attendance_percentage"):
             fn = getattr(mod, fname, None)
             if not callable(fn):

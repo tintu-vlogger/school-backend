@@ -844,3 +844,106 @@ webhook. `tests/test_tenant_isolation.py` passes.
   accounts (no keys); test mode is fully exercised.
 - No GST invoice format beyond the tax column; no accounting export (Tally) yet.
 - Fee category is matched by the learner's free-text `fee_category` (name or code of a fee category).
+
+## Exams, grading and results (module `exams`)
+
+**What it does** Any assessment system: percentage with grade bands (CBSE A1–E, ICSE / state-board
+divisions), GPA / SGPA / CGPA on 4, 5 or 10 point scales with credit weighting, pass / fail,
+descriptive and competency levels (preschool, vocational training) or plain marks. Exams per session
+and term with papers per program, schedule, seating and admit cards; keyboard marks entry with
+draft → submitted → locked flow, moderation and grace; co-scholastic grades, remarks and attendance;
+result rules that combine exams (weighted, best-of-N, average, sum, max, latest or a formula);
+cached per-learner results with ranks; audited publishing with portal notifications; report cards,
+transcripts / grade sheets (PDF) and analysis.
+
+**Backend** `modules/exams/` — `models.py`, `calc.py` (pure calculations), `service.py`,
+`documents.py` (PDFs via `modules/documents/pdf.py`), `router.py`, `hooks.py`, `seed.py`.
+
+Tables (all `company_id` + RLS, migration **`ex1a2b3c4d5e`**, `down_revision = sc1b2c3d4e5f`):
+`exam_grading_schemes`, `exam_grade_bands`, `exam_types`, `exams`, `exam_papers`, `exam_rooms`
+(seating), `exam_mark_sheets`, `exam_marks`, `exam_result_rules`, `exam_results` (cache, key
+`source` = `exam:<id>` / `rule:<id>` + student), `exam_coscholastic_areas`, `exam_term_records`,
+`exam_report_templates`.
+
+Endpoints (`/api/v1/exams`):
+- Set-up: `GET /options`; schemes `GET/POST /schemes`, `PUT/DELETE /schemes/{uuid}`,
+  `POST /schemes/{uuid}/default` (writes `profile().grading`), `GET /schemes/{uuid}/lookup?percent=`,
+  `PUT /program-schemes` (sets `Program.grading_scheme_id`); crud lists `/types`,
+  `/coscholastic-areas`, `/templates`; result rules `GET/POST /rules`, `PUT/DELETE /rules/{uuid}`.
+- Exams: `GET/POST /exams`, `GET/PUT/DELETE /exams/{uuid}`, `POST /{uuid}/restore`,
+  `POST /{uuid}/papers/generate` (from curriculum), `PUT /{uuid}/papers` (timetable, clash check),
+  `DELETE /{uuid}/papers/{paper}`, `PUT /{uuid}/seating`, `POST /{uuid}/seating/auto`,
+  `GET /{uuid}/hall-tickets.pdf`.
+- Marks: `GET /marks/sheets?exam=&mine=`, `GET/PUT /marks/sheet`, `POST /marks/sheet/action`
+  (submit / return / lock / unlock), `POST /marks/sheet/moderate`, `POST /marks/sheet/import` (CSV),
+  `GET /marks/sheet/template.csv`; `GET/PUT /coscholastic` (class teacher).
+- Results: `POST /results/compute`, `GET /results?source=`, `GET /results/{uuid}`,
+  `POST /results/publish`, `POST /results/unpublish`; `GET /report-cards.pdf?section_id=|student=`,
+  `GET /transcripts/{student}` and `/pdf`; `GET /analysis?source=`, `GET /analysis/progress/{student}`;
+  `GET /summary` (home card).
+- Portal (`register_portal_prefix("/exams/portal")`, every call checks `require_student_access`,
+  published results only): `/portal/summary`, `/portal/results`, `/portal/progress`,
+  `/portal/schedule`, `/portal/report-card.pdf`, `/portal/transcript.pdf`, `/portal/hall-ticket.pdf`.
+
+Permissions: `exams.view`, `exams.manage`, `exams.marks` (own allocation only), `exams.marks.all`
+(exam cell), `exams.moderate`, `exams.publish`, `exams.portal`. Defaults: principal all staff keys;
+teacher and manager view + marks; hr view; parent / student portal.
+
+**Rules worth knowing**
+- Scheme resolution: paper / exam / rule override → `Program.grading_scheme_id` → institution default
+  (`profile().grading`, matched to the scheme `code`). Seeded codes match the profile presets:
+  `percentage_grades`, `percentage`, `gpa_10`, `descriptive`, `competency`, plus `icse_grades`,
+  `gpa_4`, `gpa_5`, `pass_fail`, `coscholastic_3pt`.
+- Schemes are versioned: editing one used by published results creates version n+1 (same code and
+  lineage), retires the old one and moves programs to the new one; published results keep theirs.
+- Codes: AB absent (zero, fails the subject), EX exempt and ML medical (left out of totals). Papers
+  can have components (theory / practical / internal, each with its own pass mark) or be graded
+  directly (activity subjects use the 3-point co-scholastic scheme).
+- A teacher may enter marks only where `SectionSubject.teacher_id` / `assistant_ids` match; others
+  with `exams.view` see sheets read-only. Submitted sheets change only by moderators; locked by nobody.
+- Results recompute on every marks change (exam for that section plus every rule using the exam);
+  published flags survive recomputation. Ranks are standard competition ranks (1, 2, 2, 4) per section
+  and program, by GPA when present, else percentage; off per exam / rule.
+- Result rules: groups `{key, exam_ids, combine, best_of, weight}`; weighted (missing parts
+  re-normalised) or formula over group keys (`core/expressions.py`); grace (per subject / max
+  subjects / total, only to lift a fail); pass all subjects, min aggregate, supplementary up to N
+  failures (`compartment`), min attendance (`not_eligible`); CGPA across terms when `cumulative`.
+- Attendance for rules / report cards: `student_attendance.service.percentages(...)` when that module
+  is installed and has marks for the period, else days typed in on the term record.
+- Publishing writes `audit.event("exams.results.published")` and notifies learners and guardians
+  with `notify_portal`.
+
+**Front end** `/dashboard/exams` (list, exam modal: timetable grid, seating, admit cards),
+`/dashboard/exams/marks` (sheet list, full-screen keyboard grid, CSV import, moderation;
+co-scholastic & remarks tab), `/dashboard/exams/report-cards` (results + publish, bulk report cards,
+templates, transcripts), `/dashboard/exams/analysis` (stats, subject averages, grade distribution,
+score spread, sections, toppers, learner progress — recharts), `/dashboard/exams/grading` (schemes with
+band editor and score tester, program overrides, result rules, exam types, co-scholastic areas),
+portal `/dashboard/my/results` (child switcher, timetable + admit card, published results, report
+card / grade sheet download, progress chart). Shared code in `src/components/exams/shared.tsx`.
+Home cards: **`StaffHomeCard`** and **`PortalHomeCard({ studentId })`** in
+`src/components/exams/home-cards.tsx`. Nav: removed intro/features from Exams; "Report cards" renamed
+"Results & report cards".
+
+**Demo data** all seeded schemes; early-years classes use the descriptive scheme (program override);
+Unit test 1 (out of 25) and Mid-term (out of 100, Science / Computer Science with theory 80 + internal
+20) in Term 1 for every section, with marks for every learner (ability-based normal distribution, ~1%
+absent); Unit test 1 sheets locked and results published; mid-term sheets submitted except Divya
+Menon's Computer Science sheets (draft, so her home card shows pending marks); Unit test 2 scheduled
+10 days ahead; co-scholastic grades, remarks and attendance days for Term 1; result rule "Term 1
+result" (UT 20% + MT 80%, min attendance 75%, grace 3 in up to 2 subjects); default template
+"Term 1 report card" (UT, MT, weighted columns) plus the standard report card and grade sheet templates.
+
+**Tests** `tests/test_exams.py` (19): grade band lookup, GPA / SGPA / CGPA with credits, weighted and
+best-of combination, grace and pass rules, competition ranks, teacher limited to own allocation,
+validation and sheet flow (submit / lock), results and ranks via API, publishing permission and audit,
+parents see only published results of their own children, result rule weighted / best-of / formula,
+GPA scheme on a program with credits, scheme versioning, tenant isolation (API and RLS).
+
+**Not done / notes**
+- Online question papers are the LMS quizzes builder's job.
+- Room-level seating is roll ranges per room (no seat maps); auto-fill uses room capacity (40 if unset).
+- Report card logo prints only when `companies.logo_url` is an absolute or data URL (WeasyPrint has no
+  token for protected files).
+- Moderation applies one adjustment to everyone or per-learner grace; there is no separate moderation
+  approval workflow.
