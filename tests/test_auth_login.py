@@ -25,6 +25,6 @@ def test_same_email_in_two_companies_asks_for_company_address(client, company_a,
         r = c.post("/employees/", json={"first_name": "Shared", "last_name": "Person", "email": email, "password": "Secret123#"})
         assert r.status_code == 201, r.text
     r = _login(client, email, "Secret123#")
-    assert r.status_code == 409 and "more than one company" in r.json()["detail"]
+    assert r.status_code == 409 and "more than one institution" in r.json()["detail"]
     # on the company's own address it works
     assert _login(client, email, "Secret123#", slug=company_a.slug).status_code == 200
