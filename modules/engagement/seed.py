@@ -16,7 +16,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from core.config import get_settings
 
-DEMO_SLUG = "nextgenhrms-admin"
+DEMO_SLUG = "campusly-demo"
 
 
 def setup_company(db: Session, company_id: int) -> None:

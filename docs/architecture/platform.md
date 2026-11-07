@@ -1,4 +1,4 @@
-# Next Gen HRMS: platform architecture and coding rules
+# Campusly: platform architecture and coding rules
 
 This is the reference every module follows. If code and this document disagree, fix one of them.
 

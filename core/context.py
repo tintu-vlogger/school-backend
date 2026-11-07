@@ -21,7 +21,9 @@ class RequestContext:
     company_id: int | None = None
     employee_id: int | None = None
     platform_user_id: int | None = None
-    # "owner" (company owner login), "employee", "platform", "system" or "anonymous"
+    # Parent or student portal sign-in (portal_accounts.id).
+    portal_account_id: int | None = None
+    # "owner" (company owner login), "employee", "parent", "student", "platform", "system" or "anonymous"
     actor_type: str = "anonymous"
     actor_name: str | None = None
     role: str | None = None

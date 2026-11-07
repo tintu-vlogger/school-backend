@@ -80,7 +80,7 @@ def ensure_defaults(db: Session, company_id: int) -> None:
 
 # ── Demo organisation (development) ──────────────────────────────────
 
-DEMO_SLUG = "nextgenhrms-admin"
+DEMO_SLUG = "campusly-demo"
 PASSWORD = "Welcome9#"
 
 
@@ -116,58 +116,53 @@ def _pdf(title: str) -> bytes:
 
 # first, last, gender, dept, designation, location, manager (index or None), grade, joined, type, status, extra
 PEOPLE = [
-    ("Arjun", "Mehta", "M", "Leadership", "Chief Executive Officer", "BLR", None, "G7", "2018-04-02", "PERM", "confirmed", {}),
-    ("Kavitha", "Raghavan", "F", "Engineering", "VP Engineering", "BLR", 0, "G6", "2018-09-10", "PERM", "confirmed", {}),
-    ("Rohan", "Kulkarni", "M", "Sales", "Head of Sales", "PUN", 0, "G6", "2019-01-14", "PERM", "confirmed", {}),
-    ("Meenakshi", "Iyer", "F", "Finance", "Finance Controller", "CHN", 0, "G5", "2019-06-03", "PERM", "confirmed", {}),
-    ("Priya", "Sharma", "F", "Human Resources", "HR Manager", "BLR", 0, "G4", "2020-02-17", "PERM", "confirmed", {}),
-    ("Vikram", "Nair", "M", "Product", "Product Manager", "BLR", 0, "G4", "2020-08-24", "PERM", "confirmed", {}),
-    ("Sneha", "Patil", "F", "Marketing", "Marketing Manager", "PUN", 2, "G4", "2021-03-01", "PERM", "confirmed", {}),
-    ("Rahul", "Verma", "M", "Platform", "Engineering Manager", "BLR", 1, "G4", "2019-11-11", "PERM", "confirmed", {}),
-    ("Ananya", "Reddy", "F", "Platform", "Senior Software Engineer", "BLR", 7, "G3", "2021-07-05", "PERM", "confirmed", {"tags": ["High potential", "AWS certified"]}),
-    ("Karthik", "Subramanian", "M", "Platform", "Software Engineer", "CHN", 7, "G2", "2022-01-10", "PERM", "confirmed", {}),
-    ("Divya", "Menon", "F", "Mobile", "Mobile Developer", "BLR", 1, "G2", "2022-06-13", "PERM", "confirmed", {"tags": ["Women in tech"]}),
-    ("Siddharth", "Joshi", "M", "Mobile", "Software Engineer", "PUN", 1, "G2", "2023-04-03", "PERM", "confirmed", {}),
-    ("Pooja", "Deshmukh", "F", "Engineering", "QA Engineer", "PUN", 1, "G2", "2023-09-18", "PERM", "confirmed", {}),
-    ("Aditya", "Rao", "M", "Engineering", "Software Engineer", "BLR", 7, "G1", "2026-07-01", "PROB", "probation", {"tags": ["Graduate trainee", "New joiner"]}),
-    ("Neha", "Gupta", "F", "Product", "Product Designer", "BLR", 5, "G3", "2021-12-06", "PERM", "confirmed", {}),
-    ("Manish", "Agarwal", "M", "Sales", "Sales Manager", "PUN", 2, "G4", "2020-10-12", "PERM", "confirmed", {"tags": ["Successor"]}),
-    ("Lakshmi", "Narayanan", "F", "Sales", "Account Executive", "CHN", 15, "G2", "2022-11-21", "PERM", "confirmed", {}),
-    ("Imran", "Shaikh", "M", "Sales", "Account Executive", "PUN", 15, "G2", "2023-02-06", "PERM", "notice", {"tags": ["Retention risk"]}),
-    ("Ritu", "Singh", "F", "Marketing", "Content Strategist", "PUN", 6, "G2", "2022-08-01", "PERM", "confirmed", {}),
-    ("Ganesh", "Pillai", "M", "Finance", "Accountant", "CHN", 3, "G2", "2021-05-17", "PERM", "confirmed", {"tags": ["Chartered accountant"]}),
-    ("Shalini", "Krishnan", "F", "Finance", "Payroll Specialist", "CHN", 3, "G2", "2022-03-14", "PERM", "confirmed", {}),
-    ("Deepak", "Chauhan", "M", "Human Resources", "HR Executive", "BLR", 4, "G1", "2023-06-19", "PERM", "confirmed", {}),
-    ("Farah", "Khan", "F", "Human Resources", "Talent Acquisition Specialist", "PUN", 4, "G2", "2024-01-08", "CONT", "confirmed", {}),
-    ("Suresh", "Babu", "M", "Engineering", "DevOps Engineer", "CHN", 7, "G3", "2020-12-01", "PERM", "confirmed", {"tags": ["AWS certified"]}),
-    ("Tanvi", "Bhat", "F", "Marketing", "Marketing Intern", "BLR", 6, "G1", "2026-12-01", "INTERN", "pre_joining", {"tags": ["New joiner"]}),
+    ("Arjun", "Mehta", "M", "Management", "Principal", "BLR", None, "G7", "2018-04-02", "PERM", "confirmed", {}),
+    ("Kavitha", "Raghavan", "F", "Academics", "Vice Principal", "BLR", 0, "G6", "2018-09-10", "PERM", "confirmed", {}),
+    ("Rohan", "Kulkarni", "M", "Administration", "Administrative Officer", "PUN", 0, "G6", "2019-01-14", "PERM", "confirmed", {}),
+    ("Meenakshi", "Iyer", "F", "Accounts", "Bursar", "CHN", 0, "G5", "2019-06-03", "PERM", "confirmed", {}),
+    ("Priya", "Sharma", "F", "Office", "HR & Admin Manager", "BLR", 0, "G4", "2020-02-17", "PERM", "confirmed", {}),
+    ("Vikram", "Nair", "M", "Sciences", "Mathematics Teacher", "BLR", 0, "G4", "2020-08-24", "PERM", "confirmed", {}),
+    ("Sneha", "Patil", "F", "Languages", "English Teacher", "PUN", 2, "G4", "2021-03-01", "PERM", "confirmed", {}),
+    ("Rahul", "Verma", "M", "Sciences", "Head of Science", "BLR", 1, "G4", "2019-11-11", "PERM", "confirmed", {}),
+    ("Ananya", "Reddy", "F", "Sciences", "Physics Teacher", "BLR", 7, "G3", "2021-07-05", "PERM", "confirmed", {"tags": ["High potential", "AWS certified"]}),
+    ("Karthik", "Subramanian", "M", "Sciences", "Chemistry Teacher", "CHN", 7, "G2", "2022-01-10", "PERM", "confirmed", {}),
+    ("Divya", "Menon", "F", "Sciences", "Computer Science Teacher", "BLR", 1, "G2", "2022-06-13", "PERM", "confirmed", {"tags": ["Women in tech"]}),
+    ("Siddharth", "Joshi", "M", "Co-curricular", "Physical Education Teacher", "PUN", 1, "G2", "2023-04-03", "PERM", "confirmed", {}),
+    ("Pooja", "Deshmukh", "F", "Primary", "Primary Teacher", "PUN", 1, "G2", "2023-09-18", "PERM", "confirmed", {}),
+    ("Aditya", "Rao", "M", "Primary", "Trainee Teacher", "BLR", 7, "G1", "2026-07-01", "PROB", "probation", {"tags": ["Graduate trainee", "New joiner"]}),
+    ("Neha", "Gupta", "F", "Co-curricular", "Art Teacher", "BLR", 5, "G3", "2021-12-06", "PERM", "confirmed", {}),
+    ("Manish", "Agarwal", "M", "Humanities", "Head of Humanities", "PUN", 2, "G4", "2020-10-12", "PERM", "confirmed", {"tags": ["Successor"]}),
+    ("Lakshmi", "Narayanan", "F", "Languages", "Hindi Teacher", "CHN", 15, "G2", "2022-11-21", "PERM", "confirmed", {}),
+    ("Imran", "Shaikh", "M", "Humanities", "Social Science Teacher", "PUN", 15, "G2", "2023-02-06", "PERM", "notice", {"tags": ["Retention risk"]}),
+    ("Ritu", "Singh", "F", "Co-curricular", "Music Teacher", "PUN", 6, "G2", "2022-08-01", "PERM", "confirmed", {}),
+    ("Ganesh", "Pillai", "M", "Accounts", "Accountant", "CHN", 3, "G2", "2021-05-17", "PERM", "confirmed", {"tags": ["Chartered accountant"]}),
+    ("Shalini", "Krishnan", "F", "Accounts", "Fee & Payroll Officer", "CHN", 3, "G2", "2022-03-14", "PERM", "confirmed", {}),
+    ("Deepak", "Chauhan", "M", "Office", "Office Assistant", "BLR", 4, "G1", "2023-06-19", "PERM", "confirmed", {}),
+    ("Farah", "Khan", "F", "Office", "Admissions Counsellor", "PUN", 4, "G2", "2024-01-08", "CONT", "confirmed", {}),
+    ("Suresh", "Babu", "M", "Administration", "IT & Lab Administrator", "CHN", 7, "G3", "2020-12-01", "PERM", "confirmed", {"tags": ["AWS certified"]}),
+    ("Tanvi", "Bhat", "F", "Administration", "Librarian", "BLR", 6, "G1", "2026-12-01", "INTERN", "pre_joining", {"tags": ["New joiner"]}),
 ]
 
 DEPARTMENTS = [
-    ("Leadership", "LEAD", None, "CC-ADM", "BLR"), ("Engineering", "ENG", None, "CC-ENG", "BLR"),
-    ("Product", "PRD", None, "CC-ENG", "BLR"), ("Sales", "SAL", None, "CC-SAL", "PUN"),
-    ("Marketing", "MKT", None, "CC-MKT", "PUN"), ("Finance", "FIN", None, "CC-FIN", "CHN"),
-    ("Human Resources", "HR", None, "CC-HR", "BLR"),
-    ("Platform", "PLT", "Engineering", "CC-ENG", "BLR"), ("Mobile", "MOB", "Engineering", "CC-ENG", "BLR"),
+    ("Management", "MGT", None, "CC-ADM", "BLR"), ("Academics", "ACD", None, "CC-ENG", "BLR"),
+    ("Administration", "ADM", None, "CC-ADM", "BLR"), ("Accounts", "ACC", None, "CC-FIN", "CHN"),
+    ("Office", "OFF", None, "CC-HR", "BLR"),
+    ("Primary", "PRI", "Academics", "CC-ENG", "BLR"), ("Sciences", "SCI", "Academics", "CC-ENG", "BLR"),
+    ("Languages", "LAN", "Academics", "CC-ENG", "BLR"), ("Humanities", "HUM", "Academics", "CC-ENG", "BLR"),
+    ("Co-curricular", "COC", "Academics", "CC-MKT", "PUN"),
 ]
-DESIGNATION_GRADES = {
-    "Chief Executive Officer": "G7", "VP Engineering": "G6", "Head of Sales": "G6", "Finance Controller": "G5",
-    "HR Manager": "G4", "Product Manager": "G4", "Marketing Manager": "G4", "Engineering Manager": "G4",
-    "Sales Manager": "G4", "Senior Software Engineer": "G3", "Product Designer": "G3", "DevOps Engineer": "G3",
-    "Software Engineer": "G2", "Mobile Developer": "G2", "QA Engineer": "G2", "Account Executive": "G2",
-    "Content Strategist": "G2", "Accountant": "G2", "Payroll Specialist": "G2", "Talent Acquisition Specialist": "G2",
-    "HR Executive": "G1", "Marketing Intern": "G1",
+DESIGNATION_GRADES = {"Principal": "G7", "Vice Principal": "G6", "Administrative Officer": "G5", "Bursar": "G5", "HR & Admin Manager": "G4", "Mathematics Teacher": "G2", "English Teacher": "G2", "Head of Science": "G4", "Physics Teacher": "G2", "Chemistry Teacher": "G2", "Computer Science Teacher": "G2", "Physical Education Teacher": "G2", "Primary Teacher": "G2", "Trainee Teacher": "G2", "Art Teacher": "G2", "Head of Humanities": "G4", "Hindi Teacher": "G2", "Social Science Teacher": "G2", "Music Teacher": "G2", "Accountant": "G2", "Fee & Payroll Officer": "G2", "Office Assistant": "G2", "Admissions Counsellor": "G2", "IT & Lab Administrator": "G2", "Librarian": "G2"
 }
 LOCATIONS = {
-    "BLR": dict(name="Bengaluru HQ", code="BLR", kind="head_office", state="KA", city="Bengaluru", pincode="560103",
+    "BLR": dict(name="Main Campus, Bengaluru", code="BLR", kind="head_office", state="KA", city="Bengaluru", pincode="560103",
                 address_line1="4th Floor, Prestige Tech Park", address_line2="Outer Ring Road, Kadubeesanahalli",
                 latitude=Decimal("12.935200"), longitude=Decimal("77.694500"), radius_m=200, region="South",
                 entity=0, phone="+91 80 4567 1200"),
-    "PUN": dict(name="Pune Office", code="PUN", kind="branch", state="MH", city="Pune", pincode="411014",
+    "PUN": dict(name="Pune Campus", code="PUN", kind="branch", state="MH", city="Pune", pincode="411014",
                 address_line1="Tower B, EON Free Zone", address_line2="Kharadi",
                 latitude=Decimal("18.551800"), longitude=Decimal("73.947500"), radius_m=150, region="West",
                 entity=1, phone="+91 20 6789 4500"),
-    "CHN": dict(name="Chennai Office", code="CHN", kind="branch", state="TN", city="Chennai", pincode="600113",
+    "CHN": dict(name="Chennai Campus", code="CHN", kind="branch", state="TN", city="Chennai", pincode="600113",
                 address_line1="Level 6, Tidel Park", address_line2="Rajiv Gandhi Salai, Taramani",
                 latitude=Decimal("12.989900"), longitude=Decimal("80.248600"), radius_m=150, region="South",
                 entity=0, phone="+91 44 4012 3300"),
@@ -192,11 +187,11 @@ COLLEGES = [("B.E.", "Computer Science", "RV College of Engineering", "Visvesvar
             ("M.Tech", "Software Systems", "BITS Pilani", "BITS Pilani")]
 EMPLOYERS = ["Infosys", "Wipro", "TCS", "Flipkart", "Zoho", "Freshworks", "Swiggy", "Razorpay", "Accenture", "Deloitte"]
 EMP_SKILLS = {
-    "Engineering": ["Python", "Java", "AWS", "SQL", "Kubernetes"], "Platform": ["Python", "AWS", "Kubernetes", "SQL"],
-    "Mobile": ["JavaScript", "React", "Java"], "Product": ["Figma", "SQL", "Stakeholder management"],
-    "Sales": ["B2B sales", "Negotiation", "Public speaking"], "Marketing": ["Digital marketing", "Content writing"],
-    "Finance": ["Tally", "GST compliance", "Excel"], "Human Resources": ["Payroll processing", "Recruitment", "Excel"],
-    "Leadership": ["Stakeholder management", "Public speaking"],
+    "Sciences": ["Lesson planning", "Lab safety", "Classroom management"], "Primary": ["Phonics", "Storytelling", "Classroom management"],
+    "Languages": ["Lesson planning", "Public speaking", "Creative writing"], "Humanities": ["Lesson planning", "Public speaking"],
+    "Co-curricular": ["Event management", "Coaching"], "Academics": ["Curriculum design", "Public speaking"],
+    "Accounts": ["Tally", "GST compliance", "Excel"], "Office": ["Payroll processing", "Recruitment", "Excel"],
+    "Administration": ["Stakeholder management", "Excel"], "Management": ["Stakeholder management", "Public speaking"],
 }
 
 
@@ -249,7 +244,7 @@ def _seed_demo(db: Session, cid: int) -> None:  # noqa: C901  (one long, linear 
     if primary is None:
         primary = LegalEntity(company_id=cid, is_primary=True)
         db.add(primary)
-    e1 = dict(name="Next Gen HRMS India", legal_name="Next Gen HRMS India Private Limited", code="NGHI",
+    e1 = dict(name="Campusly Education", legal_name="Campusly Education Private Limited", code="NGHI",
               pan="AABCN4321K", tan="BLRN04321E", cin="U72900KA2018PTC112233", gstin="29AABCN4321K1ZQ",
               pf_code="KABNG1234567000", esi_code="53000123450001001", lin="1-2345-6789-1",
               incorporation_date=date(2018, 3, 12), address_line1="4th Floor, Prestige Tech Park",
@@ -260,10 +255,10 @@ def _seed_demo(db: Session, cid: int) -> None:  # noqa: C901  (one long, linear 
                              {"kind": "lwf", "state_id": states.get("ka"), "number": "KLWF-BLR-77812", "valid_from": "2018-04-01", "valid_to": None},
                              {"kind": "lwf", "state_id": states.get("tn"), "number": "TNLWB-CHN-11290", "valid_from": "2021-04-01", "valid_to": None},
                              {"kind": "shops", "state_id": states.get("ka"), "number": "KA/BLR/SE/2018/44121", "valid_from": "2018-04-01", "valid_to": "2028-03-31"}],
-              bank_accounts=[{"bank_id": banks.get("hdfc"), "account_name": "Next Gen HRMS India Pvt Ltd",
+              bank_accounts=[{"bank_id": banks.get("hdfc"), "account_name": "Campusly Education Pvt Ltd",
                               "account_number": "50200012345678", "ifsc": "HDFC0000523", "branch": "Koramangala",
                               "purpose": "Salary payouts", "primary": True},
-                             {"bank_id": banks.get("icic"), "account_name": "Next Gen HRMS India Pvt Ltd",
+                             {"bank_id": banks.get("icic"), "account_name": "Campusly Education Pvt Ltd",
                               "account_number": "002105012345", "ifsc": "ICIC0000021", "branch": "MG Road",
                               "purpose": "Statutory payments", "primary": False}],
               signatory={"name": "Arjun Mehta", "designation": "Director", "pan": "ABCPM1234D",
@@ -359,12 +354,15 @@ def _seed_demo(db: Session, cid: int) -> None:  # noqa: C901  (one long, linear 
                                  "KA": "570001", "MH": "422001", "WB": "700001"}[native_state],
                      "country_id": countries.get("in")}
         number = _aadhaar(rng)
-        emp.employee_code = f"NG{1001 + i}"
+        emp.employee_code = f"ST{1001 + i}"
         emp.greeting = "Mr." if g == "M" else ("Mrs." if married else "Ms.")
-        emp.role = "admin" if i == 0 else ("hr" if dept == "Human Resources" and grade != "G1" else
-                                           "manager" if mgr is None or grade in ("G4", "G5", "G6") else "employee")
+        emp.role = ("admin" if i == 0 else "principal" if desig == "Vice Principal" else
+                    "hr" if dept == "Office" and grade != "G1" else
+                    "accountant" if dept == "Accounts" else "librarian" if desig == "Librarian" else
+                    "manager" if desig.startswith("Head of") else
+                    "teacher" if "Teacher" in desig else "employee")
         if email == "priya.sharma@example.com":
-            emp.role = "employee"  # the demo self-service login stays a plain employee
+            emp.role = "employee"  # the demo self-service login stays a plain staff member
         emp.phone = f"+91 9{rng.randint(100000000, 999999999)}"
         emp.alternate_phone = f"+91 8{rng.randint(100000000, 999999999)}" if rng.random() < 0.4 else None
         emp.work_phone = LOCATIONS[loc]["phone"]
@@ -392,7 +390,7 @@ def _seed_demo(db: Session, cid: int) -> None:  # noqa: C901  (one long, linear 
             emp.driving_licence_expiry = date(t.year + rng.randint(3, 15), rng.randint(1, 12), 1)
         emp.legal_entity_id = entities[LOCATIONS[loc]["entity"]].id
         emp.location_id = locations[loc].id
-        emp.department_id = depts[dept].id if dept in depts else depts["Engineering"].id
+        emp.department_id = depts[dept].id if dept in depts else depts["Academics"].id
         emp.designation_id = desigs[desig].id
         emp.grade_id = grades[grade].id
         emp.cost_centre_id = depts[dept].cost_centre_id if dept in depts else centres["CC-ENG"].id
@@ -403,7 +401,7 @@ def _seed_demo(db: Session, cid: int) -> None:  # noqa: C901  (one long, linear 
         emp.probation_end_date = doj + timedelta(days=180)
         emp.confirmation_date = doj + timedelta(days=180) if status in ("confirmed", "notice") else None
         emp.notice_period_days = 90 if grade in ("G4", "G5", "G6", "G7") else (30 if grade == "G1" else 60)
-        emp.work_mode = "hybrid" if dept in ("Engineering", "Platform", "Mobile", "Product") else (
+        emp.work_mode = "hybrid" if dept in ("Administration",) else (
             "field" if desig == "Account Executive" else "office")
         if status == "notice":
             emp.resignation_date = t - timedelta(days=20)
@@ -421,8 +419,8 @@ def _seed_demo(db: Session, cid: int) -> None:  # noqa: C901  (one long, linear 
             people[i].reporting_manager_id = people[row[6]].id
     people[8].secondary_manager_id = people[5].id   # Ananya also works with the product manager
     people[14].secondary_manager_id = people[1].id
-    for name, head in (("Leadership", 0), ("Engineering", 1), ("Sales", 2), ("Finance", 3), ("Human Resources", 4),
-                       ("Product", 5), ("Marketing", 6), ("Platform", 7), ("Mobile", 1)):
+    for name, head in (("Management", 0), ("Academics", 1), ("Administration", 2), ("Accounts", 3), ("Office", 4),
+                       ("Sciences", 7), ("Languages", 6), ("Humanities", 15), ("Primary", 12), ("Co-curricular", 13)):
         depts[name].head_employee_id = people[head].id
     regions["South"].head_employee_id = people[1].id
     regions["West"].head_employee_id = people[2].id
@@ -518,7 +516,7 @@ def _seed_demo(db: Session, cid: int) -> None:  # noqa: C901  (one long, linear 
                                                  "DAV Public School"]),
                          university=rng.choice(["CBSE", "State Board", "ICSE"]), end_year=school_year,
                          score=f"{rng.randint(78, 96)}%"))
-        degree = COLLEGES[{"Finance": 2, "Human Resources": 3, "Marketing": 4, "Product": 5, "Sales": 4}.get(dept, rng.choice([0, 1, 6]))]
+        degree = COLLEGES[{"Accounts": 2, "Office": 3}.get(dept, rng.choice([0, 1, 6]))]
         db.add(Education(company_id=cid, employee_id=eid,
                          level_id=edu_levels.get("post-graduate" if degree[0] in ("MBA", "M.Tech") else "graduate"),
                          degree=degree[0], specialisation=degree[1], institution=degree[2], university=degree[3],

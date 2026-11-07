@@ -93,7 +93,7 @@ def attempt(db: Session, d: AutomationWebhookDelivery, hook: AutomationWebhook |
             raise RuntimeError("The webhook is switched off.")
         check_url(hook.url)
         body = body_of(d.payload or {})
-        headers = {**(hook.headers or {}), "Content-Type": "application/json", "User-Agent": "NextGenHRMS-Webhook/1",
+        headers = {**(hook.headers or {}), "Content-Type": "application/json", "User-Agent": "Campusly-Webhook/1",
                    "X-Hrms-Event": d.event, "X-Hrms-Timestamp": str(int(time.time())),
                    "X-Hrms-Delivery": str(d.uuid), "X-Hrms-Signature": sign(hook.secret, body)}
         r = httpx.post(hook.url, content=body, headers=headers, timeout=TIMEOUT_SECONDS, follow_redirects=False)

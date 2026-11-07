@@ -31,7 +31,7 @@ from modules.reports.registry import Principal, principal_for_employee
 
 router = APIRouter(prefix="/mcp", tags=["MCP"])
 PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
-SERVER_INFO = {"name": "next-gen-hrms", "title": "Next Gen HRMS", "version": "1.0.0"}
+SERVER_INFO = {"name": "campusly", "title": "Campusly", "version": "1.0.0"}
 INSTRUCTIONS = ("HR data of one company, limited to what the token's owner may see. Use list_reports to discover "
                 "reports and run_report to run them; headcount, leave, attendance and approvals have their own tools.")
 

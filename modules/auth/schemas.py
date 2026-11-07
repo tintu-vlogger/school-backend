@@ -21,16 +21,22 @@ class RegisterRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    # An email address, or for parents and students also a username such as the admission number.
+    email: str = Field(..., min_length=1, max_length=255)
     password: str
+
+    @field_validator("email")
+    @classmethod
+    def _clean_login(cls, v):
+        return v.strip()
 
 
 class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
+    email: str = Field(..., min_length=1, max_length=255)
 
 
 class ResetPasswordRequest(BaseModel):
-    email: EmailStr
+    email: str = Field(..., min_length=1, max_length=255)
     code: str
     new_password: str = Field(..., min_length=6)
 
@@ -64,6 +70,11 @@ class UserProfile(BaseModel):
     timezone: str = "Asia/Kolkata"
     timezone_source: str = "company"  # "own" or "company"
     company_timezone: str = "Asia/Kolkata"
+    # Parent / student portal sign-ins.
+    portal_id: Optional[int] = None
+    student_id: Optional[int] = None
+    guardian_id: Optional[int] = None
+    must_change_password: bool = False
 
 
 class TimezoneUpdate(BaseModel):

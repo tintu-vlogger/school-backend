@@ -1,6 +1,6 @@
 """Company web addresses (slugs).
 
-A company's slug becomes its subdomain (<slug>.nextgenhrms.com), so it must never be a
+A company's slug becomes its subdomain (<slug>.campusly.app), so it must never be a
 name the platform itself uses: our own hosts (api, www, mail...), app pages, or
 names that could be mistaken for the platform.
 """
@@ -28,7 +28,7 @@ RESERVED_SLUGS = frozenset({
     # Messaging integrations
     "whatsapp", "wa", "evolution", "webhook", "webhooks",
     # Brand
-    "nextgenhrms", "nextgen-hrms", "hrms",
+    "campusly", "nextgen-hrms", "hrms",
 })
 
 

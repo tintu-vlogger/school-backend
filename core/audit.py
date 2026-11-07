@@ -164,7 +164,7 @@ def _actor_fields() -> dict:
     ctx = context.current()
     return {
         "actor_type": ctx.actor_type or "system",
-        "actor_id": ctx.employee_id,
+        "actor_id": ctx.employee_id or ctx.portal_account_id,
         "platform_user_id": ctx.platform_user_id,
         "actor_name": (ctx.actor_name or None) and ctx.actor_name[:200],
         "ip_address": ctx.ip_address,

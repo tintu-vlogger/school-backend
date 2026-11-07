@@ -25,7 +25,7 @@ def ics(*, uid: str, start: datetime, end: datetime, summary: str, description: 
         organizer: str = "", attendees: list[tuple[str, str]] | None = None, sequence: int = 0,
         cancel: bool = False) -> str:
     """An iCalendar invite (RFC 5545) that Google, Outlook and Apple calendars accept."""
-    lines = ["BEGIN:VCALENDAR", "PRODID:-//Next Gen HRMS//Interviews//EN", "VERSION:2.0", "CALSCALE:GREGORIAN",
+    lines = ["BEGIN:VCALENDAR", "PRODID:-//Campusly//Interviews//EN", "VERSION:2.0", "CALSCALE:GREGORIAN",
              f"METHOD:{'CANCEL' if cancel else 'REQUEST'}", "BEGIN:VEVENT", f"UID:{uid}",
              f"DTSTAMP:{_fmt(datetime.now(timezone.utc))}", f"DTSTART:{_fmt(start)}", f"DTEND:{_fmt(end)}",
              f"SEQUENCE:{sequence}", f"SUMMARY:{_esc(summary)}", f"DESCRIPTION:{_esc(description)}",

@@ -299,7 +299,7 @@ def test_mcp_token_auth_scope_and_revoke(company_a, company_b):
     init = c.post("/api/v1/mcp", headers=h, json={"jsonrpc": "2.0", "id": 1, "method": "initialize",
                                                  "params": {"protocolVersion": "2025-03-26", "capabilities": {},
                                                             "clientInfo": {"name": "test", "version": "1"}}}).json()
-    assert init["result"]["serverInfo"]["name"] == "next-gen-hrms"
+    assert init["result"]["serverInfo"]["name"] == "campusly"
     assert c.post("/api/v1/mcp", headers=h, json={"jsonrpc": "2.0", "method": "notifications/initialized"}
                   ).status_code == 202
     listed = c.post("/api/v1/mcp", headers=h, json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"}).json()

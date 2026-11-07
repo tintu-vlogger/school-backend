@@ -65,7 +65,7 @@ async def _escalation_loop():
             logger.info("Escalated %s late approvals", n)
 
 
-app = FastAPI(title="Next Gen HRMS API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Campusly API", version="0.1.0", lifespan=lifespan)
 
 # ── HTTP cache headers on slow-changing public endpoints ──────────
 # Tells the browser it can reuse the same response for a short window. Auth
@@ -97,11 +97,11 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:3001",
         "http://frontend:3000",
-        "https://nextgenhrms.com",
-        "https://www.nextgenhrms.com",
+        "https://campusly.app",
+        "https://www.campusly.app",
         *[o.strip() for o in get_settings().CORS_ORIGINS.split(",") if o.strip()],
     ],
-    allow_origin_regex=r"^https?://([a-z0-9-]+\.)?(nextgenhrms\.com|lvh\.me|localhost)(:\d+)?$",
+    allow_origin_regex=r"^https?://([a-z0-9-]+\.)?(campusly\.com|lvh\.me|localhost)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -177,7 +177,7 @@ for _router in root_routers():
 
 @app.get("/")
 def root():
-    return {"message": "Next Gen HRMS API is running"}
+    return {"message": "Campusly API is running"}
 
 
 @app.get("/api/v1/health")

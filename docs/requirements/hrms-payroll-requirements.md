@@ -1,4 +1,4 @@
-# Next Gen HRMS: What the Product Must Do
+# Campusly: What the Product Must Do
 
 **An HR and payroll system for Indian companies, fully compliant with Indian law**
 
@@ -13,13 +13,13 @@
 
 ## 1. The product in one page
 
-Next Gen HRMS is an online system that an Indian company uses to manage its people and pay them correctly, from the day someone applies for a job to the day they leave and get their final dues.
+Campusly is an online system that an Indian company uses to manage its people and pay them correctly, from the day someone applies for a job to the day they leave and get their final dues.
 
 It replaces spreadsheets, paper registers, separate attendance machines, separate payroll software and the stack of government forms that HR and accounts teams handle every month.
 
-**Our promise to customers:** if you run your HR and payroll in Next Gen HRMS, you follow Indian labour and tax law by default. The system knows the rules, applies them automatically, warns you before you break one, keeps every register the law asks for, and reminds you before every government deadline.
+**Our promise to customers:** if you run your HR and payroll in Campusly, you follow Indian labour and tax law by default. The system knows the rules, applies them automatically, warns you before you break one, keeps every register the law asks for, and reminds you before every government deadline.
 
-What a company can do in Next Gen HRMS:
+What a company can do in Campusly:
 
 - Set up the company, its branches, departments and job titles
 - Keep a complete record of every employee
@@ -239,7 +239,7 @@ One screen for the owner and HR that shows, for each company and state:
 ## 5. Getting started and company setup
 
 **Signing up**
-- A company signs up on the website, gets its own web address (for example `yourcompany.nextgenhrms.com`) and starts a free trial.
+- A company signs up on the website, gets its own web address (for example `yourcompany.campusly.app`) and starts a free trial.
 - A step-by-step setup guide walks through company details, branches, departments, policies, importing employees, salary structures and the first payroll. Progress is saved.
 - Plans are priced per employee per month. Billing includes GST invoices.
 

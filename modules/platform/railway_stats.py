@@ -47,7 +47,7 @@ def _cost(cpu_min: float, mem_gb_min: float, disk_gb_min: float, egress_gb: floa
 
 def _gql(client: httpx.Client, token: str, query: str, variables: dict | None = None) -> dict:
     r = client.post(API_URL, json={"query": query, "variables": variables or {}},
-                    headers={"Project-Access-Token": token, "Content-Type": "application/json", "User-Agent": "nextgenhrms-admin"})
+                    headers={"Project-Access-Token": token, "Content-Type": "application/json", "User-Agent": "campusly-demo"})
     r.raise_for_status()
     body = r.json()
     if body.get("errors") and not body.get("data"):

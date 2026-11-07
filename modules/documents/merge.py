@@ -65,7 +65,7 @@ CATALOGUE: list[dict] = [
         ("salary.effective_from", "Revised salary from", "2026-04-01"),
     ]},
     {"group": "company", "label": "Company", "fields": [
-        ("company.name", "Company name", "Next Gen HRMS Demo"),
+        ("company.name", "Company name", "Campusly Demo"),
         ("company.address", "Address", "4th Floor, Prestige Tower, Bengaluru"),
         ("company.city", "City", "Bengaluru"),
         ("company.state", "State", "Karnataka"),
@@ -75,7 +75,7 @@ CATALOGUE: list[dict] = [
         ("company.logo", "Logo (image)", ""),
     ]},
     {"group": "legal_entity", "label": "Legal entity", "fields": [
-        ("legal_entity.name", "Registered name", "Next Gen HRMS Demo Private Limited"),
+        ("legal_entity.name", "Registered name", "Campusly Demo Private Limited"),
         ("legal_entity.address", "Registered address", "4th Floor, Prestige Tower, Bengaluru 560001"),
         ("legal_entity.cin", "CIN", "U72900KA2020PTC123456"),
         ("legal_entity.pan", "PAN", "AABCN1234F"),

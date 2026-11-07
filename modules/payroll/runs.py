@@ -506,7 +506,7 @@ def send_reminders(db: Session, company_id: int, run: PayRun) -> dict:
                                         link="/dashboard/profile")
             for e in emps:
                 send_email(e.email, f"Add your {what} for salary",
-                           f"Hello {e.first_name},\n\nYour {what} is missing in Next Gen HRMS. Please add it in your "
+                           f"Hello {e.first_name},\n\nYour {what} is missing in Campusly. Please add it in your "
                            f"profile before payroll for {run.title} is processed.\n")
     _stage(run, "reminders_sent", f"{sent['approvers']} approvers, {sent['employees']} employees")
     audit.event(db, "payroll.reminders_sent", "pay_runs", run.id, dict(sent), entity_uuid=str(run.uuid))

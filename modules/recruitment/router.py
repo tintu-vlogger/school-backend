@@ -761,7 +761,7 @@ def interview_ics(uuid: UUID, db: Session = Depends(get_db), user: dict = Depend
     v = _v(db, user)
     iv = _iv(db, v, uuid)
     a = iv.application
-    text = mailer.ics(uid=f"{iv.uuid}@nextgenhrms", start=iv.starts_at, end=iv.ends_at,
+    text = mailer.ics(uid=f"{iv.uuid}@campusly", start=iv.starts_at, end=iv.ends_at,
                       summary=f"Interview: {a.candidate.first_name} {a.candidate.last_name} ({a.job.title})",
                       description=iv.meeting_link or "", location=iv.meeting_link or iv.location or "",
                       sequence=iv.sequence, cancel=iv.status == "cancelled")

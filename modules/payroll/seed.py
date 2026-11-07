@@ -105,7 +105,7 @@ def seed_demo(db: Session, company_id: int) -> None:
     _seed_demo_first(db, company_id)
     from modules.company.models import Company
     company = db.query(Company).filter(Company.id == company_id).first()
-    if company and company.slug == "nextgenhrms-admin":
+    if company and company.slug == "campusly-demo":
         from modules.payroll import demo_second
         demo_second.seed(db, company_id)
 
@@ -116,7 +116,7 @@ def _seed_demo_first(db: Session, company_id: int) -> None:
     from modules.payroll import service as svc
     from modules.payroll.models import EmployeeSalary, PayRun
     company = db.query(Company).filter(Company.id == company_id).first()
-    if not company or company.slug != "nextgenhrms-admin":
+    if not company or company.slug != "campusly-demo":
         return
     if db.query(EmployeeSalary.id).filter(EmployeeSalary.company_id == company_id).first():
         return

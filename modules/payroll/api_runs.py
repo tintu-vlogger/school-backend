@@ -438,7 +438,7 @@ def _email_payslip(db: Session, cid: int, p: Payslip, company, settings) -> bool
     month = p.period_start.strftime("%B %Y")
     hint = pdf.password_hint((settings.get("payslip") or {}).get("password", "pan"))
     body = (f"Hello {snap.get('name')},\n\nYour payslip for {month} is attached. Net pay: ₹{p.net}.\n"
-            f"Open it with: {hint}.\n\nYou can also see it in Next Gen HRMS under My pay.\n")
+            f"Open it with: {hint}.\n\nYou can also see it in Campusly under My pay.\n")
     if not email_configured():
         import logging
         logging.getLogger(__name__).warning("[email not configured] payslip to %s for %s", snap.get("email"), month)

@@ -20,6 +20,8 @@ class Notification(Base):
     uuid = Column(UUID(as_uuid=True), unique=True, nullable=False, server_default=text("gen_random_uuid()"))
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
     employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)  # addressed to one employee
+    # Addressed to a parent or student portal sign-in instead.
+    portal_account_id = Column(Integer, ForeignKey("portal_accounts.id", ondelete="CASCADE"), nullable=True, index=True)
     channel = Column(String(20), nullable=False)
     message_type = Column(String(50), nullable=False)
     message_content = Column(Text, nullable=False)

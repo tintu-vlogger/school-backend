@@ -40,7 +40,7 @@ def get_subscription(
         c.get("active", True) and str(c.get("starts_on") or "")[:10] <= today and (not c.get("expires_on") or str(c["expires_on"])[:10] >= today)
         for c in ps.get("coupons") or []
     ) and any(p["coupons"] for p in out["periods"])
-    out["pay_to"] = {"upi_id": ps["upi_id"], "name": ps["upi_name"], "support_phone": ps["support_phone"], "note": f"Next Gen HRMS {company.slug}"}
+    out["pay_to"] = {"upi_id": ps["upi_id"], "name": ps["upi_name"], "support_phone": ps["support_phone"], "note": f"Campusly {company.slug}"}
     return out
 
 

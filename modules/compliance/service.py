@@ -275,7 +275,7 @@ def _notices(db: Session, company_id: int, today: date, recs: dict) -> list[dict
     out = []
     for n in NOTICES:
         key = f"notice:{n['id']}"
-        out.append({**n, "key": key, "read": key in recs, "source": "Next Gen HRMS"})
+        out.append({**n, "key": key, "read": key in recs, "source": "Campusly"})
     try:
         from modules.payroll import statutory
         for r in statutory.library_rows(db):

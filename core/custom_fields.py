@@ -27,6 +27,9 @@ ENTITIES = {
     "asset": "Asset",
     "helpdesk_case": "Help desk case",
     "candidate": "Candidate",
+    "student": "Student",
+    "guardian": "Parent / guardian",
+    "admission": "Admission application",
 }
 FIELD_TYPES = {
     "text": "Short text", "textarea": "Long text", "number": "Number", "date": "Date", "boolean": "Yes / no",

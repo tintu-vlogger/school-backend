@@ -1,6 +1,6 @@
 """Public company lookup by web address. No sign-in needed.
 
-Used by the frontend to decide whether <slug>.nextgenhrms.com belongs to a company,
+Used by the frontend to decide whether <slug>.campusly.app belongs to a company,
 and to show the company's name and logo on its sign-in page."""
 import base64
 

@@ -56,7 +56,7 @@ KINDS = {
         "fields": [
             _f("provider", "Gateway", "select", required=True,
                options=[{"value": v, "label": v} for v in ("MSG91", "Gupshup", "Kaleyra", "Twilio", "Other")]),
-            _f("sender_id", "Sender ID (DLT header)", required=True, placeholder="NGHRMS"),
+            _f("sender_id", "Sender ID (DLT header)", required=True, placeholder="CMPSLY"),
             _f("entity_id", "DLT entity ID"),
             _f("api_key", "API key", "password", secret=True),
         ]},

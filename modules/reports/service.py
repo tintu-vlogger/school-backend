@@ -492,7 +492,7 @@ def ensure_standard(db: Session, company_id: int) -> int:
         if r is None:
             db.add(Report(company_id=company_id, key=d["key"], name=d["name"], description=d["description"],
                           category=d["category"], source=d["source"], config=d["config"], chart=d["chart"],
-                          is_standard=True, owner_name="Next Gen HRMS", scope="auto"))
+                          is_standard=True, owner_name="Campusly", scope="auto"))
             added += 1
             continue
         for attr in ("name", "description", "category", "source", "config", "chart"):

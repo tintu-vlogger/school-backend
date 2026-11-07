@@ -1,4 +1,4 @@
-"""Platform-side accounts and money: the people who run Next Gen HRMS (admins), the
+"""Platform-side accounts and money: the people who run Campusly (admins), the
 partners who bring companies in, subscription payments recorded by hand after a UPI
 transfer, the commissions those payments earn, and payouts.
 

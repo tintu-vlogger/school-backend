@@ -95,6 +95,53 @@ def _employee_payload(emp: Employee, company: Company | None) -> dict:
     }
 
 
+def _portal_name(acc) -> str:
+    person = acc.student if acc.kind == "student" else acc.guardian
+    return person.full_name if person else acc.login
+
+
+def _portal_token(acc) -> str:
+    return create_access_token({"sub": acc.login, "company_id": acc.company_id, "role": acc.kind,
+                                "employee_id": None, "portal_id": acc.id, "student_id": acc.student_id,
+                                "guardian_id": acc.guardian_id, "name": _portal_name(acc)})
+
+
+def _portal_payload(acc, company: Company | None) -> dict:
+    return {
+        "email": acc.login,
+        "role": acc.kind,
+        "company_id": acc.company_id,
+        "company_name": company.company_name if company else "",
+        "full_name": _portal_name(acc),
+        "slug": company.slug if company else None,
+        "employee_id": None,
+        "portal_id": acc.id,
+        "student_id": acc.student_id,
+        "guardian_id": acc.guardian_id,
+        "must_change_password": acc.must_change_password,
+    }
+
+
+def _portal_signed_in(db: Session, acc) -> None:
+    ctx = context.current()
+    set_tenant(db, acc.company_id)
+    ctx.portal_account_id = acc.id
+    ctx.actor_type = acc.kind
+    ctx.actor_name = _portal_name(acc)
+    acc.last_login_at = datetime.now(timezone.utc)
+    audit.event(db, "auth.signed_in", "portal_accounts", acc.id, {"method": "password"}, entity_label=ctx.actor_name)
+    db.commit()
+
+
+def _portal_login(db: Session, company_id: int, login: str, password: str):
+    from modules.students.models import PortalAccount
+    acc = db.query(PortalAccount).filter(PortalAccount.company_id == company_id,
+                                         PortalAccount.login == login.lower()).first()
+    if acc and acc.active and verify_password(password, acc.password):
+        return acc
+    return None
+
+
 def _signed_in(db: Session, company: Company | None, emp: Employee | None, method: str) -> None:
     """Record a successful sign-in in the audit log."""
     ctx = context.current()
@@ -119,7 +166,7 @@ def _start_trial(db: Session, company: Company) -> None:
 def register(req: RegisterRequest, request: Request, db: Session = Depends(get_db)):
     """Create a new company and sign its owner in. Only on the main site."""
     if request.headers.get("x-company-slug"):
-        raise HTTPException(status_code=403, detail="New companies can only sign up on the main site.")
+        raise HTTPException(status_code=403, detail="New institutions can only sign up on the main site.")
 
     if db.query(Company.id).filter(Company.email == req.email).first():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
@@ -182,6 +229,15 @@ def _login(req: LoginRequest, request: Request, db: Session):
             _signed_in(db, company, emp, "password")
             return TokenResponse(access_token=_employee_token(emp), user=_employee_payload(emp, company))
 
+        # Parents and students.
+        acc = _portal_login(db, header_company_id, req.email, req.password)
+        if acc:
+            company = db.query(Company).filter(Company.id == acc.company_id).first()
+            if company and not company.active:
+                raise HTTPException(status_code=403, detail=DISABLED_DETAIL)
+            _portal_signed_in(db, acc)
+            return TokenResponse(access_token=_portal_token(acc), user=_portal_payload(acc, company))
+
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     # Main site: company owners only.
@@ -207,7 +263,25 @@ def _login(req: LoginRequest, request: Request, db: Session):
         return TokenResponse(access_token=_employee_token(emp), user=_employee_payload(emp, company))
     if len(matches) > 1:
         names = ", ".join(sorted(companies[e.company_id].company_name for e in matches))
-        raise HTTPException(status_code=409, detail=f"This email is used at more than one company ({names}). Sign in from your company's own address.")
+        raise HTTPException(status_code=409, detail=f"This email is used at more than one institution ({names}). Sign in from your institution's own address.")
+
+    # A parent or student on the main site: same idea, matched on their sign-in name.
+    from modules.students.models import PortalAccount
+    with bypass_rls(db):
+        accs = [a for a in db.query(PortalAccount).filter(PortalAccount.login == req.email.lower(),
+                                                          PortalAccount.active.is_(True)).all()
+                if verify_password(req.password, a.password)]
+        comps = {c.id: c for c in db.query(Company).filter(Company.id.in_([a.company_id for a in accs])).all()} if accs else {}
+        accs = [a for a in accs if comps.get(a.company_id) and comps[a.company_id].active]
+        if len(accs) == 1:
+            acc = accs[0]
+            _ = acc.student, acc.guardian  # load names while RLS is off
+    if len(accs) == 1:
+        _portal_signed_in(db, acc)
+        return TokenResponse(access_token=_portal_token(acc), user=_portal_payload(acc, comps[acc.company_id]))
+    if len(accs) > 1:
+        names = ", ".join(sorted(comps[a.company_id].company_name for a in accs))
+        raise HTTPException(status_code=409, detail=f"This sign-in is used at more than one institution ({names}). Sign in from your institution's own address.")
 
     raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -219,6 +293,8 @@ def get_me(current_user: dict = Depends(get_current_user), db: Session = Depends
         raise HTTPException(status_code=404, detail="Company not found")
 
     config = company.config if isinstance(company.config, dict) else {}
+    if current_user.get("portal_id"):
+        return _portal_me(db, company, current_user)
     full_name = config.get("owner_name", "")
     employee_uuid = None
     own_tz = config.get("owner_timezone")
@@ -257,6 +333,28 @@ def get_me(current_user: dict = Depends(get_current_user), db: Session = Depends
     )
 
 
+def _portal_me(db: Session, company: Company, current_user: dict) -> UserProfile:
+    from core.timeutil import effective_timezone, is_valid_timezone
+    from modules.platform.subscription import subscription_state
+    from modules.students.models import PortalAccount
+    acc = db.query(PortalAccount).filter(PortalAccount.id == current_user["portal_id"]).first()
+    if acc is None:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    config = company.config if isinstance(company.config, dict) else {}
+    company_tz = effective_timezone(None, company)
+    own = acc.timezone if is_valid_timezone(acc.timezone) else None
+    return UserProfile(
+        email=acc.login, role=acc.kind, company_id=company.id, company_name=company.company_name,
+        full_name=_portal_name(acc), slug=company.slug, setup_complete=True, picture="",
+        employee_id=None, employee_uuid=None, is_owner=False,
+        features=config.get("features") if isinstance(config.get("features"), dict) else {},
+        subscription=subscription_state(company), timezone=own or company_tz,
+        timezone_source="own" if own else "company", company_timezone=company_tz,
+        portal_id=acc.id, student_id=acc.student_id, guardian_id=acc.guardian_id,
+        must_change_password=acc.must_change_password,
+    )
+
+
 @router.put("/me/timezone")
 def update_my_timezone(req: TimezoneUpdate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Set the signed-in person's own timezone (e.g. detected from the browser). Empty
@@ -265,6 +363,12 @@ def update_my_timezone(req: TimezoneUpdate, current_user: dict = Depends(get_cur
     tz = (req.timezone or "").strip() or None
     if tz and not is_valid_timezone(tz):
         raise HTTPException(status_code=400, detail="That timezone isn't recognised. Pick one from the list.")
+    if current_user.get("portal_id"):
+        from modules.students.models import PortalAccount
+        acc = db.query(PortalAccount).filter(PortalAccount.id == current_user["portal_id"]).first()
+        acc.timezone = tz
+        db.commit()
+        return {"timezone": tz}
     if current_user.get("employee_id") and not current_user.get("is_owner"):
         emp = db.query(Employee).filter(Employee.id == current_user["employee_id"]).first()
         if not emp:
@@ -304,9 +408,13 @@ def forgot_password(req: ForgotPasswordRequest, request: Request, db: Session = 
         return generic
 
     if header_company_id is not None:
+        from modules.students.models import PortalAccount
         exists = bool(
             db.query(Company.id).filter(Company.id == header_company_id, Company.email == req.email).scalar()
             or db.query(Employee.id).filter(Employee.company_id == header_company_id, Employee.email == req.email).scalar()
+            or db.query(PortalAccount.id).filter(PortalAccount.company_id == header_company_id,
+                                                 PortalAccount.login == req.email.lower(),
+                                                 PortalAccount.login.contains("@")).scalar()
         )
     else:
         exists = bool(db.query(Company.id).filter(Company.email == req.email).scalar())
@@ -352,9 +460,12 @@ def reset_password(req: ResetPasswordRequest, request: Request, db: Session = De
 
     hashed = hash_password(req.new_password)
     if header_company_id is not None:
+        from modules.students.models import PortalAccount
         account = (
             db.query(Company).filter(Company.id == header_company_id, Company.email == req.email).first()
             or db.query(Employee).filter(Employee.company_id == header_company_id, Employee.email == req.email).first()
+            or db.query(PortalAccount).filter(PortalAccount.company_id == header_company_id,
+                                              PortalAccount.login == req.email.lower()).first()
         )
     else:
         account = db.query(Company).filter(Company.email == req.email).first()
@@ -376,13 +487,25 @@ def change_password(payload: dict, current_user: dict = Depends(get_current_user
     new = payload.get("new_password") or ""
     if len(new) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
-    if current_user.get("employee_id") and not current_user.get("is_owner"):
+    if current_user.get("portal_id"):
+        from modules.students.models import PortalAccount
+        account = db.query(PortalAccount).filter(PortalAccount.id == current_user["portal_id"]).first()
+        if account is not None and account.must_change_password and not current:
+            current = None  # first sign-in: the one-time password was just used
+    elif current_user.get("employee_id") and not current_user.get("is_owner"):
         account = db.query(Employee).filter(Employee.id == current_user["employee_id"]).first()
     else:
         account = db.query(Company).filter(Company.id == current_user["company_id"]).first()
+    if account is not None and current is None:
+        account.password = hash_password(new)
+        account.must_change_password = False
+        db.commit()
+        return {"detail": "Password changed"}
     if not account or not verify_password(current, account.password):
         raise HTTPException(status_code=400, detail="Your current password is not correct")
     account.password = hash_password(new)
+    if current_user.get("portal_id"):
+        account.must_change_password = False
     if current_user.get("is_owner"):
         from modules.company.owner import sync_owner_password
         sync_owner_password(db, current_user["company_id"], account.password)
@@ -406,6 +529,22 @@ def impersonate_employee(
         raise HTTPException(status_code=404, detail="Employee not found")
     company = db.query(Company).filter(Company.id == emp.company_id).first()
     return {"access_token": _employee_token(emp), "token_type": "bearer", "user": _employee_payload(emp, company)}
+
+
+@router.post("/impersonate-portal/{account_id}")
+def impersonate_portal(account_id: int, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Let the administrator see the parent or student portal as one of its users."""
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only the administrator can do this")
+    from modules.students.models import PortalAccount
+    acc = db.query(PortalAccount).filter(PortalAccount.id == account_id,
+                                         PortalAccount.company_id == current_user["company_id"]).first()
+    if not acc:
+        raise HTTPException(status_code=404, detail="Account not found")
+    audit.event(db, "auth.viewed_as", "portal_accounts", acc.id, {}, entity_label=_portal_name(acc))
+    db.commit()
+    company = db.query(Company).filter(Company.id == acc.company_id).first()
+    return {"access_token": _portal_token(acc), "token_type": "bearer", "user": _portal_payload(acc, company)}
 
 
 # Google and Microsoft sign-in live in modules/sso (no new companies from a sign-in; only

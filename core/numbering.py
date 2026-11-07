@@ -82,7 +82,19 @@ DEFAULT_SERIES = [
     ("letter", "Letters", "LTR", "{PREFIX}/{FY}/{SEQ:4}", "financial_year", True, "Reference numbers on letters."),
     ("asset", "Assets", "AST", "{PREFIX}{SEQ:5}", "never", True, "Asset tags."),
     ("ticket", "Help desk tickets", "TKT", "{PREFIX}{YY}{SEQ:5}", "yearly", True, "Help desk ticket numbers."),
+    ("student", "Admission number", "ADM", "{PREFIX}{YYYY}{SEQ:4}", "never", True,
+     "Given to every new student or learner on admission."),
+    ("certificate", "Certificates", "CERT", "{PREFIX}/{YYYY}/{SEQ:4}", "yearly", True,
+     "Transfer, bonafide, character and other certificates."),
 ]
+
+
+def register_series(key: str, name: str, prefix: str, pattern: str, reset: str = "yearly", active: bool = True,
+                    description: str = "") -> None:
+    """Modules add their own number series at import time (from hooks.py); every company
+    gets it at the next start-up or sign-up."""
+    if not any(row[0] == key for row in DEFAULT_SERIES):
+        DEFAULT_SERIES.append((key, name, prefix, pattern, reset, active, description))
 
 
 def ensure_default_series(db: Session, company_id: int) -> None:

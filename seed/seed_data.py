@@ -8,8 +8,8 @@ from core.config import get_settings
 from core.db import system_session
 
 DEMO_COMPANY = {
-    "company_name": "Next Gen HRMS Demo",
-    "slug": "nextgenhrms-admin",
+    "company_name": "Campusly Demo",
+    "slug": "campusly-demo",
     "email": "tintu@test.com",
     "password": "Welcome9#",
     "owner_name": "Tintu C Raju",
@@ -137,7 +137,7 @@ def seed_platform_admin(db: Session) -> None:
         if settings.is_production:
             print("[seed] No platform admin: set PLATFORM_ADMIN_EMAIL and PLATFORM_ADMIN_PASSWORD (10+ chars)")
             return
-        email, password = "admin@nextgenhrms.dev", "Platform9#admin"
+        email, password = "admin@campusly.dev", "Platform9#admin"
     db.add(PlatformUser(name="Platform admin", email=email, role="admin", password=hash_password(password)))
     db.commit()
     print(f"[seed] Platform admin created: {email}")
@@ -184,15 +184,19 @@ def run_seed() -> None:
         seed_platform_admin(db)
         if not get_settings().is_production:
             seed_demo_company(db)
+        demo_id = None
         for (company_id, slug) in db.query(Company.id, Company.slug).all():
             db.info["company_id"] = company_id
             setup_company(db, company_id)
             if not get_settings().is_production and slug == DEMO_COMPANY["slug"]:
-                _module_demo(db, company_id)
+                demo_id = company_id
         db.info.pop("company_id", None)
-        if not get_settings().is_production:
+        if demo_id is not None:
+            # Staff first, so the school demo data (classes, teachers, students) can use them.
             from modules.organization.seed import seed_demo_people
             seed_demo_people(db)
+            db.info["company_id"] = demo_id
+            _module_demo(db, demo_id)
             db.info.pop("company_id", None)
         _daily_people_tasks(db)
         print("Seed data ready.")

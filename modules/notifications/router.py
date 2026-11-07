@@ -21,7 +21,7 @@ router = APIRouter(prefix="/notifications", tags=["Notifications"])
 def _visible(query, current_user: dict):
     """Employees see messages addressed to them (and old-style broadcasts); the owner sees
     the ones addressed to the owner."""
-    return service.visible(query, current_user["company_id"], current_user.get("employee_id"))
+    return service.visible(query, current_user["company_id"], current_user.get("employee_id"), current_user.get("portal_id"))
 
 
 @router.get("/", response_model=list[NotificationResponse])
@@ -76,12 +76,12 @@ def notification_inbox(
         "read": r.read_at is not None, "created_at": r.created_at,
     } for r in rows]
     return {"items": items, "total": total, "page": page, "size": size,
-            "unread": service.unread_count(db, current_user["company_id"], current_user.get("employee_id"))}
+            "unread": service.unread_count(db, current_user["company_id"], current_user.get("employee_id"), current_user.get("portal_id"))}
 
 
 @router.get("/unread-count")
 def notification_unread_count(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    return {"count": service.unread_count(db, current_user["company_id"], current_user.get("employee_id"))}
+    return {"count": service.unread_count(db, current_user["company_id"], current_user.get("employee_id"), current_user.get("portal_id"))}
 
 
 class _ReadRequest(BaseModel):
@@ -90,9 +90,9 @@ class _ReadRequest(BaseModel):
 
 @router.post("/read")
 def mark_notifications_read(req: _ReadRequest, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    n = service.mark_read(db, current_user["company_id"], current_user.get("employee_id"), req.uuids)
+    n = service.mark_read(db, current_user["company_id"], current_user.get("employee_id"), req.uuids, current_user.get("portal_id"))
     db.commit()
-    return {"marked": n, "unread": service.unread_count(db, current_user["company_id"], current_user.get("employee_id"))}
+    return {"marked": n, "unread": service.unread_count(db, current_user["company_id"], current_user.get("employee_id"), current_user.get("portal_id"))}
 
 
 @router.post("/push-token")

@@ -20,7 +20,7 @@ from sqlalchemy import text  # noqa: E402
 from core import context  # noqa: E402
 from core.db import system_session  # noqa: E402
 
-DEMO_SLUG = "nextgenhrms-admin"
+DEMO_SLUG = "campusly-demo"
 OWNER_NAME = ("Tintu", "C Raju")
 MAX_UNREAD = 12
 

@@ -146,7 +146,7 @@ All 88 pass.
 - **Approvals.** Approving from email or WhatsApp, automatic approval after a time limit, and attachments on requests are not built. Notifications are in-app rows only.
 - **Number series per legal entity.** Not built yet, because there are no legal entities yet.
 - **Older modules.** Their logic still needs moving into `service.py` files, and the older department and designation lists still need server pagination.
-- **Demo data.** The demo company (nextgenhrms-admin) now has:
+- **Demo data.** The demo company (campusly-demo) now has:
   - a test employee, priya.sharma@example.com / Welcome9#, with a pending change request REQ-2611-0001;
   - a custom section "Statutory details";
   - two inactive test departments from the UI checks.

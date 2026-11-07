@@ -864,7 +864,7 @@ def _send_invites(db: Session, iv: Interview, cancel: bool = False) -> int:
     summary = f"Interview: {app.candidate.first_name} {app.candidate.last_name} for {app.job.title} ({iv.round_name})"
     attendees = [(f"{app.candidate.first_name} {app.candidate.last_name}", app.candidate.email or "")] + \
                 [(c.display_name(p), p.email) for p in panel]
-    text = mailer.ics(uid=f"{iv.uuid}@nextgenhrms", start=iv.starts_at, end=iv.ends_at, summary=summary,
+    text = mailer.ics(uid=f"{iv.uuid}@campusly", start=iv.starts_at, end=iv.ends_at, summary=summary,
                       description=f"{iv.round_name} · {MODES.get(iv.mode, '')}\n{iv.meeting_link or ''}\n{iv.notes or ''}",
                       location=where, organizer=(comp.email if comp else ""), attendees=attendees,
                       sequence=iv.sequence, cancel=cancel)

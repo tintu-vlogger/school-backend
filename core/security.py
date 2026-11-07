@@ -36,7 +36,7 @@ def create_access_token(data: dict) -> str:
 _ACTIVE_TTL = 20
 _active_cache: dict[int, tuple[str, float]] = {}
 
-DISABLED_DETAIL = "This company has been disabled. Please contact Next Gen HRMS support."
+DISABLED_DETAIL = "This institution has been disabled. Please contact Campusly support."
 GONE_DETAIL = "This company does not exist."
 WRONG_COMPANY_DETAIL = "Token does not belong to this company"
 
@@ -77,6 +77,7 @@ def get_current_user(
         company_id: int = payload.get("company_id")
         role: str = payload.get("role")
         employee_id = payload.get("employee_id")
+        portal_id = payload.get("portal_id")
         # The company owner: full admin rights, and (since owners have their own employee
         # record) usually an employee_id too. Older tokens mark the owner by having none.
         is_owner = bool(payload.get("owner")) or (role == "admin" and not employee_id)
@@ -89,7 +90,8 @@ def get_current_user(
     ctx.company_id = company_id
     ctx.employee_id = employee_id
     ctx.role = role
-    ctx.actor_type = "owner" if is_owner else "employee"
+    ctx.portal_account_id = portal_id
+    ctx.actor_type = "owner" if is_owner else (role if portal_id else "employee")
     ctx.actor_name = payload.get("name") or email
     set_tenant(db, company_id)
 
@@ -108,13 +110,64 @@ def get_current_user(
         if slug_company_id != company_id:
             raise HTTPException(status_code=403, detail=WRONG_COMPANY_DETAIL)
 
+    if portal_id:
+        if not _portal_account_active(db, portal_id):
+            raise HTTPException(status_code=401, detail="This sign-in has been switched off.")
+        if not portal_path_allowed(request.url.path):
+            raise HTTPException(status_code=403, detail="This page is not available in the parent and student portal.")
+
     return {
         "email": email,
         "company_id": company_id,
         "role": role,
         "employee_id": employee_id,
         "is_owner": is_owner,
+        # Parent / student portal sign-ins (None for staff).
+        "portal_id": portal_id,
+        "student_id": payload.get("student_id"),
+        "guardian_id": payload.get("guardian_id"),
     }
+
+
+# API areas parent and student sign-ins may call at all (each endpoint still checks access).
+# Modules add theirs from hooks.py with register_portal_prefix("/fees").
+PORTAL_PREFIXES: set[str] = {"/auth", "/academics/profile", "/academics/section-options", "/students/mine",
+                             "/students/", "/notifications", "/roles/my-permissions", "/workflow/my", "/portal"}
+
+
+def register_portal_prefix(*prefixes: str) -> None:
+    for p in prefixes:
+        PORTAL_PREFIXES.add(p if p.startswith("/") else "/" + p)
+
+
+def portal_path_allowed(path: str) -> bool:
+    rest = path.split("/api/v1", 1)[1] if "/api/v1" in path else path
+    return any(rest == p or rest.startswith(p.rstrip("/") + "/") or (p.endswith("/") and rest.startswith(p))
+               for p in PORTAL_PREFIXES)
+
+
+_portal_cache: dict[int, tuple[bool, float]] = {}
+
+
+def _portal_account_active(db: Session, portal_id: int) -> bool:
+    import time
+    hit = _portal_cache.get(portal_id)
+    if hit and time.monotonic() - hit[1] < _ACTIVE_TTL:
+        return hit[0]
+    from modules.students.models import PortalAccount
+    row = db.query(PortalAccount.active).filter(PortalAccount.id == portal_id).first()
+    ok = bool(row and row[0])
+    _portal_cache[portal_id] = (ok, time.monotonic())
+    return ok
+
+
+def require_portal(*kinds: str):
+    """Dependency: a parent and/or student portal sign-in, e.g. Depends(require_portal("parent", "student"))."""
+    def checker(current_user: dict = Depends(get_current_user)):
+        if not current_user.get("portal_id") or current_user["role"] not in kinds:
+            raise HTTPException(status_code=403, detail="This page is for parents and students.")
+        return current_user
+    return checker
 
 
 def require_admin(current_user: dict = Depends(get_current_user)):

@@ -298,7 +298,7 @@ def _fetch(url: str, limit: int) -> tuple[bytes, str, str] | None:
         if urlparse(url).scheme not in ("http", "https") or not _public_host(url):
             return None
         with httpx.Client(timeout=4.0, follow_redirects=False,
-                          headers={"User-Agent": "NextGenHRMS-LinkPreview/1.0", "Accept": "text/html,image/*"}) as c:
+                          headers={"User-Agent": "Campusly-LinkPreview/1.0", "Accept": "text/html,image/*"}) as c:
             with c.stream("GET", url) as r:
                 if r.status_code in (301, 302, 303, 307, 308) and r.headers.get("location"):
                     url = urljoin(url, r.headers["location"])

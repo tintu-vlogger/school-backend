@@ -1,6 +1,6 @@
 # Brief for module builders
 
-You are building one module of Next Gen HRMS, a multi-tenant HR and payroll SaaS for Indian companies. Several builders work in parallel on different modules. Work autonomously to completion: the product owner is not available, so do not ask questions; decide sensibly and record your decisions.
+You are building one module of Campusly, a multi-tenant HR and payroll SaaS for Indian companies. Several builders work in parallel on different modules. Work autonomously to completion: the product owner is not available, so do not ask questions; decide sensibly and record your decisions.
 
 ## Read first
 1. `backend/docs/architecture/platform.md`: architecture and coding rules (tenant isolation, audit, time, masters, custom fields, number series, rules, workflow engine, API and web conventions, the **UI kit** in §10, building blocks in §13). Follow it exactly.
@@ -14,7 +14,7 @@ You are building one module of Next Gen HRMS, a multi-tenant HR and payroll SaaS
 - Backend `/Users/tintucraju/Projects/Personal/hrai/backend` (venv `.venv`, run with `PYTHONPATH=.`). API runs with --reload at http://127.0.0.1:8100 (restart in the background if it dies: `cd backend && PYTHONPATH=. .venv/bin/uvicorn main:app --host 127.0.0.1 --port 8100 --reload`).
 - Web `/Users/tintucraju/Projects/Personal/hrai/frontend` (Next.js; read `frontend/AGENTS.md`). Dev server at http://localhost:3100 in webpack mode (if it dies: `npx next dev --webpack -p 3100` from frontend/; Turbopack currently fails on the Google font). Disk space is limited (about 10 GB free): never create extra databases (tests make and drop their own), delete your screenshots after checking them, and do not copy large files.
 - DB `hrms` (local Postgres, user tintucraju), tests use `hrms_test`.
-- Logins: owner `tintu@test.com` / `Welcome9#` (company web address `nextgenhrms-admin`; sign-in at http://localhost:3100/login redirects to http://nextgenhrms-admin.localhost:3100), employee `priya.sharma@example.com` / `Welcome9#`, platform admin `admin@nextgenhrms.dev` / `Platform9#admin`.
+- Logins: owner `tintu@test.com` / `Welcome9#` (company web address `campusly-demo`; sign-in at http://localhost:3100/login redirects to http://campusly-demo.localhost:3100), employee `priya.sharma@example.com` / `Welcome9#`, platform admin `admin@campusly.dev` / `Platform9#admin`.
 - Headless browser checks: playwright-core at `/private/tmp/claude-502/-Users-tintucraju-Projects-Personal-hrai/6d822b4a-6b83-471a-91bf-1ca474f9bde1/scratchpad/shot` with `executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"`, headless. Always end scripts with `process.exit(0)`. Never touch the Chrome on port 9333.
 - Never touch `/Users/tintucraju/Projects/Personal/clinimate` or `~/Projects/hrms`.
 

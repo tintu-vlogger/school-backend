@@ -1,4 +1,4 @@
-# Naming map: from the clinic base to Next Gen HRMS
+# Naming map: from the clinic base to Campusly
 
 The codebase started as a clinic product. Everything we keep is renamed to HR terms, and everything clinic-only is removed. This map is the single reference for the database, the backend and the frontend.
 
@@ -49,10 +49,10 @@ The codebase started as a clinic product. Everything we keep is renamed to HR te
 | Old | New |
 |---|---|
 | `bookeasy_token`, `bookeasy_admin_token` | `hrms_token`, `hrms_admin_token` |
-| `clineasy_*`, `clinimate_*`, `nextgenhrms_*` leftovers | `hrms_*` |
+| `clineasy_*`, `clinimate_*`, `campusly_*` leftovers | `hrms_*` |
 
 ## Development data
 
-- Platform admin: `admin@nextgenhrms.dev` / `Platform9#admin`
-- Demo company owner: `tintu@test.com` / `Welcome9#` (web address `nextgenhrms-admin`)
+- Platform admin: `admin@campusly.dev` / `Platform9#admin`
+- Demo company owner: `tintu@test.com` / `Welcome9#` (web address `campusly-demo`)
 - No clinic seed data (no clinic test companies, medical departments or designations).

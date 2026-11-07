@@ -1,6 +1,6 @@
 """Company website.
 
-The company's own address (<slug>.nextgenhrms.com) opens its organisation website: who they are,
+The company's own address (<slug>.campusly.app) opens its organisation website: who they are,
 what they value, life at work, leadership, offices, open jobs and contact, with an employee
 sign-in. HR picks one of four designs and edits the content in Settings → Company website.
 Content lives in companies.config["website"]; nothing here needs its own table.

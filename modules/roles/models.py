@@ -117,7 +117,7 @@ _EVERYONE = ["overview.view", "time.roster.view", "time.attendance.view", "time.
 
 # Default permissions for each system role.
 DEFAULT_ROLE_PERMISSIONS = {
-    "admin": list(ALL_PERMISSIONS.keys()),  # HR admin gets everything
+    "admin": list(ALL_PERMISSIONS.keys()),  # administrators get everything
     "hr": [
         *_EVERYONE,
         "people.employees.view", "people.employees.manage",
@@ -144,8 +144,39 @@ DEFAULT_ROLE_PERMISSIONS = {
 }
 
 SYSTEM_ROLES = {
-    "admin": ("HR admin", "Full access to everything"),
-    "hr": ("HR", "Runs people, time and payroll operations"),
-    "manager": ("Manager", "Looks after a team: approvals, roster and reviews"),
-    "employee": ("Employee", "Self-service: own profile, attendance and leave"),
+    "admin": ("Administrator", "Full access to everything"),
+    "principal": ("Principal / Head", "Runs academics: classes, students, attendance, exams and results"),
+    "hr": ("Office / HR", "Runs staff, admissions office work, time and payroll"),
+    "manager": ("Head of department", "Looks after a department: approvals and reviews"),
+    "teacher": ("Teacher / Faculty", "Own classes: attendance, homework, marks and messages"),
+    "accountant": ("Accountant", "Fees, receipts, refunds and finance reports"),
+    "librarian": ("Librarian", "Library catalogue, issues and returns"),
+    "employee": ("Staff", "Self-service: own profile, attendance and leave"),
+    "parent": ("Parent / Guardian", "Parent portal: children's attendance, fees, results and messages"),
+    "student": ("Student / Learner", "Student portal: timetable, homework, classes, results and fees"),
 }
+
+# Roles used by portal accounts (parents and students) rather than staff records.
+PORTAL_ROLES = ("parent", "student")
+for _r in ("principal", "teacher", "accountant", "librarian"):
+    DEFAULT_ROLE_PERMISSIONS.setdefault(_r, [*_EVERYONE, "people.departments.view", "people.designations.view"])
+DEFAULT_ROLE_PERMISSIONS.setdefault("parent", [])
+DEFAULT_ROLE_PERMISSIONS.setdefault("student", [])
+
+
+def register_permissions(perms: dict[str, str], roles: dict[str, list[str]] | None = None) -> None:
+    """Add a module's permissions to the product list at import time (call from the
+    module's hooks.py). Administrators always get every key; `roles` maps other system
+    role names to the keys they get by default, e.g.
+        register_permissions({"fees.view": "See fees", "fees.manage": "..."},
+                             {"accountant": ["fees.view", "fees.manage"], "parent": ["fees.portal"]})
+    """
+    for key, label in perms.items():
+        ALL_PERMISSIONS.setdefault(key, label)
+        if key not in DEFAULT_ROLE_PERMISSIONS["admin"]:
+            DEFAULT_ROLE_PERMISSIONS["admin"].append(key)
+    for role, keys in (roles or {}).items():
+        bucket = DEFAULT_ROLE_PERMISSIONS.setdefault(role, [])
+        for key in keys:
+            if key not in bucket:
+                bucket.append(key)

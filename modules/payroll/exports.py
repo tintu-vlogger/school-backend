@@ -409,7 +409,7 @@ def tds_return(db: Session, company_id: int, fy: str, quarter: int, *, fmt: str 
     ay = f"{int(fy[:4]) + 1}{str(int(fy[:4]) + 2)[-2:]}"
     fy_code = f"{fy[:4]}{fy[-2:]}"
     lines = []
-    lines.append("^".join(["1", "FH", "SL1", "R", date.today().strftime("%d%m%Y"), "1", "D", (ent["tan"] or ""), "1", "NGHRMS"] + [""] * 4))
+    lines.append("^".join(["1", "FH", "SL1", "R", date.today().strftime("%d%m%Y"), "1", "D", (ent["tan"] or ""), "1", "CMPSLY"] + [""] * 4))
     total_tds = sum((_amount(p, "TDS") for p in slips), ZERO)
     lines.append("^".join(["2", "BH", "1", str(len(by_month)), "24Q", "", "", "", "", "", "", (ent["tan"] or ""), "",
                            (ent["pan"] or ""), ay, fy_code, f"Q{quarter}", (ent["legal_name"] or "")[:75], "", "",

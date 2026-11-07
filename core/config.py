@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     # Public web address of the frontend, used in links sent to people.
     FRONTEND_URL: str = "http://localhost:3001"
     # First platform admin, created at startup when the platform_users table is empty.
-    # Required in production; development falls back to admin@nextgenhrms.dev / Platform9#admin.
+    # Required in production; development falls back to admin@campusly.dev / Platform9#admin.
     PLATFORM_ADMIN_EMAIL: str = ""
     PLATFORM_ADMIN_PASSWORD: str = ""
     # Unprivileged database role the API switches to when it connects as a superuser,
